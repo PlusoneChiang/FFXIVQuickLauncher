@@ -69,7 +69,7 @@ public static class LaunchServices
         {
             var enableUidCache = Program.Config?.IsUidCacheEnabled ?? false;
             var gamePath = Program.Config!.GamePath;
-
+            Log.Information($"Starting login action: {action}, {username},{otp}, {recaptchaToken}, UidCache: {enableUidCache}, GamePath: {gamePath}");
             EnsureLauncherAffinity((License)Program.Config.License);
             if (action == LoginAction.Repair)
                 return await Program.Launcher!.Login(username, password, otp, recaptchaToken, false, false, gamePath, true, Program.Config.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);

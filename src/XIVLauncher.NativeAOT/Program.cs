@@ -190,6 +190,7 @@ public class Program
     public static nint TryLoginToGame(nint username, nint password, nint otp, nint recaptchaToken, bool repair)
     {
         //TODO: 使用RecapchaToken登入
+        Log.Information("Attempting login for user {Username}", Marshal.PtrToStringUTF8(username)!);
         try
         {
             return MarshalUtf8.StringToHGlobal(LaunchServices.TryLoginToGame(Marshal.PtrToStringUTF8(username)!, Marshal.PtrToStringUTF8(password)!, Marshal.PtrToStringUTF8(otp)!, Marshal.PtrToStringUTF8(recaptchaToken)!, repair).Result);
