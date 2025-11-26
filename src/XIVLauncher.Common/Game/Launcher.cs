@@ -278,6 +278,11 @@ public class Launcher
 
     public async Task<string> ExchangeSessionId(string token)
     {
+        if (token == "0")
+        {
+            // NOTE(Kulimi): For FakeLogin
+            return "0";
+        }
         var requestObj = new Dictionary<string, string>{
             { "token", token }
         };
@@ -634,7 +639,7 @@ public class Launcher
     // FOR FFXIV TC
     private async Task<OauthLoginResult> OauthLogin(string userName, string password, string otp, string token, bool isFreeTrial, bool isSteam, int region, Ticket? steamTicket)
     {
-
+        Log.Information($"recaptchaToken: {token}");
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://user.ffxiv.com.tw/api/login/launcherLogin");
         var loginData = new Dictionary<string, string>
         {
