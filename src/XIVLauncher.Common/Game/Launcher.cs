@@ -723,8 +723,7 @@ public class Launcher
     {
         var hashString = Environment.MachineName + Environment.UserName + Environment.OSVersion +
                          Environment.ProcessorCount;
-
-        using var sha1 = HashAlgorithm.Create("SHA1");
+        using var sha1 = SHA1.Create();
 
         var bytes = new byte[5];
 
