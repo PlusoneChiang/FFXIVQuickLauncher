@@ -114,6 +114,8 @@ public class RemotePatchInstaller
 
     private bool RunInstallQueue()
     {
+
+        Log.Information("[PATCHER] Running install queue");
         if (this.queuedInstalls.TryDequeue(out var installData))
         {
             // Ensure that subdirs exist
@@ -125,6 +127,7 @@ public class RemotePatchInstaller
 
             try
             {
+                Log.Information("[PATCHER] Installing patch {PatchFile} to {GameDirectory}", installData.PatchFile.FullName, Path.Combine(installData.GameDirectory.FullName, installData.Repo == Repository.Boot ? "boot" : "game"));
                 InstallPatch(installData.PatchFile.FullName,
                     Path.Combine(installData.GameDirectory.FullName,
                         installData.Repo == Repository.Boot ? "boot" : "game"));
@@ -177,7 +180,21 @@ public class RemotePatchInstaller
     {
         Log.Information("[PATCHER] Installing {0} to {1}", patchPath, gamePath);
 
+        var patchInfo = new FileInfo(patchPath);
+        if (!patchInfo.Exists)
+        {
+            Log.Error("[PATCHER] Patch file missing before install: {PatchPath}", patchPath);
+            throw new FileNotFoundException("Patch file missing", patchPath);
+        }
+
+        if (patchInfo.Length == 0)
+        {
+            Log.Error("[PATCHER] Patch file is empty: {PatchPath}", patchPath);
+            throw new ZiPatchException("Patch file is empty");
+        }
+
         using var patchFile = ZiPatchFile.FromFileName(patchPath);
+        Log.Information("[PATCHER] Patch file loaded");
 
         using (var store = new SqexFileStreamStore())
         {
