@@ -237,7 +237,9 @@ public class Launcher
         Log.Information("XivGame::LaunchGame(steamServiceAccount:{IsSteam}, args:{AdditionalArguments})",
                         isSteamServiceAccount,
                         additionalArguments);
+        Log.Information("Session ID: {SessionId}", sessionId);
         var tcSessionId = ExchangeSessionId(sessionId).Result;
+        Log.Information("TC Session ID: {TcSessionId}", tcSessionId);
         var exePath = Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe");
         var environment = new Dictionary<string, string>();
         var argumentBuilder = new ArgumentBuilder()
@@ -278,6 +280,11 @@ public class Launcher
 
     public async Task<string> ExchangeSessionId(string token)
     {
+        if (token == "0")
+        {
+            // NOTE(Kulimi): For FakeLogin
+            return "0";
+        }
         var requestObj = new Dictionary<string, string>{
             { "token", token }
         };
@@ -455,6 +462,8 @@ public class Launcher
 
     public async Task<PatchListEntry[]> CheckBootVersion(DirectoryInfo gamePath, bool forceBaseVersion = false)
     {
+        return Array.Empty<PatchListEntry>();
+
         var bootVersion = forceBaseVersion ? Constants.BASE_GAME_VERSION : Repository.Boot.GetVer(gamePath);
         var request = new HttpRequestMessage(HttpMethod.Get,
             $"http://patch-bootver.ffxiv.com/http/win32/ffxivneo_release_boot/{bootVersion}/?time=" +
@@ -484,6 +493,11 @@ public class Launcher
     // FOR FFXIV TC
     private async Task<(string? Uid, LoginState result, PatchListEntry[] PendingGamePatches)> RegisterSession(OauthLoginResult loginResult, DirectoryInfo gamePath, bool forceBaseVersion)
     {
+        Log.Information($"POST: http://patch-gamever.ffxiv.com.tw/http/win32/ffxivtc_release_tc_game/{(forceBaseVersion ? Constants.BASE_GAME_VERSION : Repository.Ffxiv.GetVer(gamePath))}/{loginResult.SessionId}");
+        Log.Information($"Connection: Keep-Alive");
+        Log.Information($"User-Agent: {Constants.PatcherUserAgent}");
+        Log.Information($"X-Hash-Check: enabled");
+        
         var request = new HttpRequestMessage(HttpMethod.Post,
                                              $"http://patch-gamever.ffxiv.com.tw/http/win32/ffxivtc_release_tc_game/{(forceBaseVersion ? Constants.BASE_GAME_VERSION : Repository.Ffxiv.GetVer(gamePath))}/{loginResult.SessionId}");
 
@@ -494,10 +508,11 @@ public class Launcher
         if (!forceBaseVersion)
             EnsureVersionSanity(gamePath, loginResult.MaxExpansion);
         request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(GetVersionReport(gamePath, loginResult.MaxExpansion, forceBaseVersion)));
+        Log.Information($"Content: {GetVersionReport(gamePath, loginResult.MaxExpansion, forceBaseVersion)}");
 
         var resp = await this.client.SendAsync(request);
         var text = await resp.Content.ReadAsStringAsync();
-
+        Log.Information("RegisterSession response: {Text}", text);
         /*
          * Conflict indicates that boot needs to update, we do not get a patch list or a unique ID to download patches with in this case.
          * This means that server requested us to patch Boot, even though in order to get to this place, we just checked for boot patches.
@@ -634,7 +649,7 @@ public class Launcher
     // FOR FFXIV TC
     private async Task<OauthLoginResult> OauthLogin(string userName, string password, string otp, string token, bool isFreeTrial, bool isSteam, int region, Ticket? steamTicket)
     {
-
+        Log.Information($"recaptchaToken: {token}");
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://user.ffxiv.com.tw/api/login/launcherLogin");
         var loginData = new Dictionary<string, string>
         {
@@ -657,6 +672,7 @@ public class Launcher
             throw new OauthLoginException($"Login failed: {error}");
         }
         var remainSeconds = int.Parse(loginResult["remain"].ToString() ?? "0");
+        Log.Information($"OauthLoginResult: {sessionId}, {remainSeconds}");
         return new OauthLoginResult
         {
             SessionId = sessionId.ToString(),
@@ -723,8 +739,7 @@ public class Launcher
     {
         var hashString = Environment.MachineName + Environment.UserName + Environment.OSVersion +
                          Environment.ProcessorCount;
-
-        using var sha1 = HashAlgorithm.Create("SHA1");
+        using var sha1 = SHA1.Create();
 
         var bytes = new byte[5];
 
