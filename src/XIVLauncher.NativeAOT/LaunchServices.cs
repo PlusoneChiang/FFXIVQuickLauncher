@@ -207,11 +207,12 @@ public static class LaunchServices
 
         if (Environment.OSVersion.Platform == PlatformID.Win32NT)
         {
+            Log.Information("Starting dalamud with WindowsGameRunner", "Have fun!");
             runner = new WindowsGameRunner(dalamudLauncher, dalamudOk);
         }
         else if (Environment.OSVersion.Platform == PlatformID.Unix)
         {
-            Log.Information("Starting game...", "Have fun!");
+            Log.Information("Starting dalamud with UnixGameRunner", "Have fun!");
 
             runner = new UnixGameRunner(Program.CompatibilityTools, dalamudLauncher, dalamudOk);
 

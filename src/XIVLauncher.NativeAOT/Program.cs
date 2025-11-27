@@ -98,7 +98,7 @@ public class Program
         {
             Overlay = dalamudLoadInfo
         };
-        DalamudUpdater.Run(null, null, true);
+        // DalamudUpdater.Run(null, null, true);
 
         UniqueIdCache = new CommonUniqueIdCache(Storage.GetFile("uidCache.json"));
         Launcher = new Launcher(steam: null,UniqueIdCache, CommonSettings, FrontierUrl);
@@ -236,9 +236,9 @@ public class Program
     public static nint GetBootPatches()
     {
         // TC伺服器的Boot更新 maybe skip?
-        // Note(Kulimi) 目前不運作，裡面使用的還是國際服邏輯
-        throw new NotImplementedException();
-        // return MarshalUtf8.StringToHGlobal(LaunchServices.GetBootPatches().Result);
+        // Note(Kulimi) 目前固定回傳空列表
+        // throw new NotImplementedException();
+        return MarshalUtf8.StringToHGlobal(LaunchServices.GetBootPatches().Result);
     }
 
     [UnmanagedCallersOnly(EntryPoint = "installPatch")]
@@ -261,11 +261,12 @@ public class Program
     [UnmanagedCallersOnly(EntryPoint = "checkPatchValidity")]
     public static bool CheckPatchValidity(nint path, long patchLength, long hashBlockSize, nint hashType, nint hashes)
     {
-        Log.Information($"[PATCHER] Checking patch validity: {path}, {patchLength}, {hashBlockSize}, {hashType}, {hashes}");
+        
         try
         {
             var pathInfo = new FileInfo(Marshal.PtrToStringUTF8(path)!);
             var splitHashes = Marshal.PtrToStringUTF8(hashes)!.Split(',');
+            Log.Information($"[PATCHER] Checking patch validity: {pathInfo.FullName}, {patchLength}, {hashBlockSize}, {Marshal.PtrToStringUTF8(hashType)!}, {string.Join(",", splitHashes)}");
             return LaunchServices.CheckPatchValidity(pathInfo, patchLength, hashBlockSize, Marshal.PtrToStringUTF8(hashType)!, splitHashes);
         }
         catch (Exception ex)
