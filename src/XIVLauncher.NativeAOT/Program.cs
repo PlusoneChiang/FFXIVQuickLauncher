@@ -236,7 +236,9 @@ public class Program
     public static nint GetBootPatches()
     {
         // TC伺服器的Boot更新 maybe skip?
-        return MarshalUtf8.StringToHGlobal(LaunchServices.GetBootPatches().Result);
+        // Note(Kulimi) 目前不運作，裡面使用的還是國際服邏輯
+        throw new NotImplementedException();
+        // return MarshalUtf8.StringToHGlobal(LaunchServices.GetBootPatches().Result);
     }
 
     [UnmanagedCallersOnly(EntryPoint = "installPatch")]
@@ -259,6 +261,7 @@ public class Program
     [UnmanagedCallersOnly(EntryPoint = "checkPatchValidity")]
     public static bool CheckPatchValidity(nint path, long patchLength, long hashBlockSize, nint hashType, nint hashes)
     {
+        Log.Information($"[PATCHER] Checking patch validity: {path}, {patchLength}, {hashBlockSize}, {hashType}, {hashes}");
         try
         {
             var pathInfo = new FileInfo(Marshal.PtrToStringUTF8(path)!);
