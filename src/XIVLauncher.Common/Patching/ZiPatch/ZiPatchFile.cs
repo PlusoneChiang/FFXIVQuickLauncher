@@ -54,6 +54,12 @@ namespace XIVLauncher.Common.Patching.ZiPatch
                 chunk = ZiPatchChunk.GetChunk(_stream, _needsChecksum);
 
                 yield return chunk;
+                
+                // Check if this is the end of file chunk
+                if (chunk is EndOfFileChunk)
+                {
+                    yield break;
+                }
             }
             while (chunk.ChunkType != EndOfFileChunk.Type);
         }
