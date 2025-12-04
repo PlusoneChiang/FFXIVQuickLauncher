@@ -287,17 +287,16 @@ public class Launcher
         var response = await this.client.PostAsync(url, content);
         response.EnsureSuccessStatusCode();
         var responseBody = await response.Content.ReadAsStringAsync();
-        var responseObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseBody)
-            ?? throw new Exception("Failed to exchange session ID: could not parse server response.");
+        var responseObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseBody) ?? [];
         if (responseObj.TryGetValue("error", out var errorNews))
         {
-            throw new Exception($"Failed to exchange session ID: server returned error: {errorNews}");
+            throw new OauthLoginException($"[ERROR] Server returned error: {errorNews}");
         }
         if (responseObj.TryGetValue("sessionId", out var sessionId))
         {
             return sessionId;
         }
-        throw new Exception("Failed to exchange session ID: server response did not contain a session ID.");
+        throw new OauthLoginException($"[ERROR] Unknown error occurred during session exchange. {responseBody}");
     }
 
     // public Process? LaunchGame(
@@ -652,10 +651,10 @@ public class Launcher
         var reply = await response.Content.ReadAsStringAsync();
 
         //TODO: 取到Error massage或是取不到token，代表登入失敗惹。
-        var loginResult = JsonConvert.DeserializeObject<Dictionary<string, object>>(reply);
+        var loginResult = JsonConvert.DeserializeObject<Dictionary<string, object>>(reply) ?? [];
         if (loginResult.TryGetValue("error", out var error) || !loginResult.TryGetValue("token", out var sessionId))
         {
-            throw new OauthLoginException($"Login failed: {error}");
+            throw new OauthLoginException($"[ERROR] Login failed: {error}");
         }
         var remainSeconds = int.Parse(loginResult["remain"].ToString() ?? "0");
         return new OauthLoginResult
