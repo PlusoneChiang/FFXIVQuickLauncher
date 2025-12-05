@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Text.RegularExpressions;
-using Serilog;
 
 namespace XIVLauncher.Common.Game.Exceptions;
 
@@ -9,7 +7,8 @@ public class OauthLoginException : Exception
 {
     public string? OauthErrorMessage { get; private set; }
 
-    public OauthLoginException(string document)
+
+    public OauthLoginException(string document) : base(document)
     {
         this.OauthErrorMessage = document;
     }
