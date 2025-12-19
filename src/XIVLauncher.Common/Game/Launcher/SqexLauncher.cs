@@ -21,6 +21,7 @@ using XIVLauncher.Common.Game.Exceptions;
 using XIVLauncher.Common.PlatformAbstractions;
 using XIVLauncher.Common.Util;
 using System.Security.Authentication;
+using System.Text.Json.Serialization;
 
 namespace XIVLauncher.Common.Game.Launcher;
 
@@ -189,11 +190,11 @@ public class SqexLauncher : ILauncher
             { "token", token }
         };
         var url = "https://user.ffxiv.com.tw/api/login/launcherSession";
-        var content = new StringContent(JsonSerializer.Serialize(requestObj), Encoding.UTF8, "application/json");
+        var content = new StringContent(JsonSerializer.Serialize(requestObj, TcLoginResponseContext.Default.DictionaryStringString), Encoding.UTF8, "application/json");
         var response = await this.client.PostAsync(url, content);
         response.EnsureSuccessStatusCode();
         var responseBody = await response.Content.ReadAsStringAsync();
-        var responseObj = JsonSerializer.Deserialize<Dictionary<string, string>>(responseBody) ?? [];
+        var responseObj = JsonSerializer.Deserialize(responseBody, TcLoginResponseContext.Default.DictionaryStringString) ?? [];
         if (responseObj.TryGetValue("error", out var errorNews))
         {
             throw new OauthLoginException($"[ERROR] Server returned error: {errorNews}");
@@ -509,14 +510,14 @@ public class SqexLauncher : ILauncher
             { "token", token }
             
         };
-        var content = new StringContent(JsonSerializer.Serialize(loginData), Encoding.UTF8, "application/json");
+        var content = new StringContent(JsonSerializer.Serialize(loginData, TcLoginResponseContext.Default.DictionaryStringString), Encoding.UTF8, "application/json");
         httpRequest.Content = content;
         var response = await this.client.SendAsync(httpRequest);
 
         var reply = await response.Content.ReadAsStringAsync();
 
         //TODO: 取到Error massage或是取不到token，代表登入失敗惹。
-        var loginResult = JsonSerializer.Deserialize<Dictionary<string, object>>(reply) ?? [];
+        var loginResult = JsonSerializer.Deserialize(reply, TcLoginResponseContext.Default.DictionaryStringString) ?? [];
         if (loginResult.TryGetValue("error", out var error) || !loginResult.TryGetValue("token", out var loginToken))
         {
             throw new OauthLoginException($"[ERROR] Login failed: {error}");
@@ -650,4 +651,8 @@ public class SqexLauncher : ILauncher
     {
         return string.Format(USER_AGENT_TEMPLATE, MakeComputerId());
     }
+}
+[JsonSerializable(typeof(Dictionary<string, string>))]
+public partial class TcLoginResponseContext : JsonSerializerContext
+{
 }
