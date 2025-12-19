@@ -194,14 +194,14 @@ public class SqexLauncher : ILauncher
         var response = await this.client.PostAsync(url, content);
         response.EnsureSuccessStatusCode();
         var responseBody = await response.Content.ReadAsStringAsync();
-        var responseObj = JsonSerializer.Deserialize(responseBody, TcLoginResponseContext.Default.DictionaryStringString) ?? [];
+        var responseObj = JsonSerializer.Deserialize(responseBody, TcLoginResponseContext.Default.DictionaryStringObject) ?? [];
         if (responseObj.TryGetValue("error", out var errorNews))
         {
             throw new OauthLoginException($"[ERROR] Server returned error: {errorNews}");
         }
         if (responseObj.TryGetValue("sessionId", out var sessionId))
         {
-            return sessionId;
+            return sessionId.ToString() ?? "";
         }
         throw new OauthLoginException($"[ERROR] Unknown error occurred during session exchange. {responseBody}");
     }
@@ -517,7 +517,7 @@ public class SqexLauncher : ILauncher
         var reply = await response.Content.ReadAsStringAsync();
 
         //TODO: 取到Error massage或是取不到token，代表登入失敗惹。
-        var loginResult = JsonSerializer.Deserialize(reply, TcLoginResponseContext.Default.DictionaryStringString) ?? [];
+        var loginResult = JsonSerializer.Deserialize(reply, TcLoginResponseContext.Default.DictionaryStringObject) ?? [];
         if (loginResult.TryGetValue("error", out var error) || !loginResult.TryGetValue("token", out var loginToken))
         {
             throw new OauthLoginException($"[ERROR] Login failed: {error}");
@@ -653,6 +653,9 @@ public class SqexLauncher : ILauncher
     }
 }
 [JsonSerializable(typeof(Dictionary<string, string>))]
+[JsonSerializable(typeof(Dictionary<string, object>))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(int))]
 public partial class TcLoginResponseContext : JsonSerializerContext
 {
 }
