@@ -281,7 +281,8 @@ namespace XIVLauncher.Windows
             };
             fakeStartMenuItem.Click += FakeStart_OnClick;
 
-            LoginContextMenu.Items.Add(fakeStartMenuItem);
+            // var popupContent = LaunchOptionsPopupBox.PopupContent as Menu;
+            // popupContent!.Items.Add(fakeStartMenuItem);
 #endif
 
             this.SetDefaults();
@@ -407,6 +408,14 @@ namespace XIVLauncher.Windows
 
                 PlatformHelpers.OpenBrowser(url + item.Id);
             }
+        }
+
+        private void LoginButton_OnMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Right)
+                return;
+
+            // LaunchOptionsPopupBox.IsPopupOpen = true;
         }
 
         private void WorldStatusButton_Click(object sender, RoutedEventArgs e)

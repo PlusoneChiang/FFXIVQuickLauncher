@@ -329,8 +329,7 @@
                                                                          HorizontalAlignment="Left"
                                                                          VerticalAlignment="Center"
                                                                          Margin="0,0,7,0"
-                                                                         ToolTip="{Binding Path=LaunchOptionsLoc}"
-                                                                         >
+                                                                         ToolTip="{Binding Path=LaunchOptionsLoc}">
 
                                                         <materialDesign:PopupBox.ToggleContent>
                                                             <Border Margin="0,0,0,0"
@@ -368,7 +367,7 @@
                                                                 </Menu.ItemsPanel>
                                                                 <MenuItem Header="{Binding LoginRepairLoc}"
                                                                       Command="{Binding Path=LoginRepairCommand}" />
-                                                                <Separator Visibility="Collapsed"/>
+                                                                <Separator Visibility="Collapsed" />
                                                                 <MenuItem Header="{Binding LoginNoDalamudLoc}" Visibility="Collapsed"
                                                                       Command="{Binding Path=LoginNoDalamudCommand}" />
                                                                 <MenuItem Header="{Binding LoginNoPluginsLoc}" Visibility="Collapsed"

@@ -56,7 +56,7 @@ namespace XIVLauncher.Windows
                     return;
                 }
 
-                if (!GameHelpers.IsValidGamePath(GamePathEntry.Text))
+                if (!GameHelpers.PathHasExistingInstall(GamePathEntry.Text))
                 {
                     if (CustomMessageBox.Show(Loc.Localize("GamePathInvalidConfirm", "The folder you selected has no installation of the game.\nXIVLauncher will install the game the first time you log in.\nContinue?"), "XIVLauncher",
                             MessageBoxButton.YesNo, MessageBoxImage.Information, parentWindow: this) != MessageBoxResult.Yes)
@@ -68,6 +68,15 @@ namespace XIVLauncher.Windows
                 if (GameHelpers.CanMightNotBeInternationalClient(GamePathEntry.Text))
                 {
                     if (CustomMessageBox.Show(Loc.Localize("GamePathRegionConfirm", "The folder you selected might be the Chinese or Korean release of the game. XIVLauncher only supports international release of the game.\nIs the folder you've selected indeed for the international version?"), "XIVLauncher",
+                            MessageBoxButton.YesNo, MessageBoxImage.Warning, parentWindow: this) != MessageBoxResult.Yes)
+                    {
+                        return;
+                    }
+                }
+
+                if (new DirectoryInfo(GamePathEntry.Text).Parent == null)
+                {
+                    if (CustomMessageBox.Show(Loc.Localize("GamePathRootConfirm", "You have selected a root directory as your game path. This is not recommended.\nAre you sure you want to continue?"), "XIVLauncher",
                             MessageBoxButton.YesNo, MessageBoxImage.Warning, parentWindow: this) != MessageBoxResult.Yes)
                     {
                         return;
