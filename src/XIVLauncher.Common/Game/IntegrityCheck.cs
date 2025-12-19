@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 
 namespace XIVLauncher.Common.Game
 {
@@ -118,7 +119,8 @@ namespace XIVLauncher.Common.Game
 
             var request = new HttpRequestMessage(HttpMethod.Get, INTEGRITY_CHECK_BASE_URL + gameVersion + ".json");
             var response = await client.SendAsync(request, cancellationToken);
-            var result = JsonSerializer.Deserialize<IntegrityCheckData>(await response.Content.ReadAsStringAsync());
+            var result = JsonSerializer.Deserialize<IntegrityCheckData>(await response.Content.ReadAsStringAsync(),
+                IntegrityCheckResultJsonContext.Default.IntegrityCheckData);
             return result ?? throw new InvalidOperationException("Failed to deserialize integrity JSON");
         }
 
@@ -186,5 +188,10 @@ namespace XIVLauncher.Common.Game
                     CrawlDirectory(dir, sha1, rootDirectory, ref results, progress, onlyIndex);
             }
         }
+    }
+
+    [JsonSerializable(typeof(IntegrityCheck.IntegrityCheckData))]
+    internal partial class IntegrityCheckResultJsonContext: JsonSerializerContext
+    {
     }
 }

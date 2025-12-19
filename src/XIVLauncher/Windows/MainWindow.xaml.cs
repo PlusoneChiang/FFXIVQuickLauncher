@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CheapLoc;
 using Serilog;
@@ -17,6 +18,7 @@ using XIVLauncher.Accounts;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.Game;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Game.Patch.Acquisition;
 using XIVLauncher.Common.Util;
 using XIVLauncher.Support;
@@ -51,7 +53,7 @@ namespace XIVLauncher.Windows
         private AccountManager _accountManager;
 
         private MainWindowViewModel Model => this.DataContext as MainWindowViewModel;
-        private readonly Launcher _launcher;
+        private readonly SqexLauncher _launcher;
 
         public MainWindow()
         {
@@ -469,10 +471,9 @@ namespace XIVLauncher.Windows
                 // ignored
             }
 
-            var hasBootPatch = bootPatches.Length > 0;
-            if (gateStatus || hasBootPatch)
+            if (gateStatus || bootPatches != null)
             {
-                if (hasBootPatch)
+                if (bootPatches != null)
                 {
                     CustomMessageBox.Show(Loc.Localize("MaintenanceQueueBootPatch",
                         "A patch for the official launcher was detected.\nThis usually means that there is a patch for the game as well.\n\nYou will now be logged in."), "XIVLauncher", parentWindow: this);
@@ -571,9 +572,9 @@ namespace XIVLauncher.Windows
 
         private void FakeStart_OnClick(object sender, RoutedEventArgs e)
         {
-            _ = Model.StartGameAndAddon(new Launcher.LoginResult
+            _ = Model.StartGameAndAddon(new LoginResult
             {
-                OauthLogin = new Launcher.OauthLoginResult
+                OauthLogin = new OauthLoginResult
                 {
                     MaxExpansion = 4,
                     Playable = true,
@@ -581,7 +582,7 @@ namespace XIVLauncher.Windows
                     SessionId = "0",
                     TermsAccepted = true
                 },
-                State = Launcher.LoginState.Ok,
+                State = LoginState.Ok,
                 UniqueId = "0"
             }, false, false, false, false).ConfigureAwait(false);
         }

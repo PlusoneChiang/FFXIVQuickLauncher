@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
-using Newtonsoft.Json;
 using PInvoke;
 using Serilog;
 using XIVLauncher.Common.Dalamud;
@@ -191,13 +191,13 @@ public class WindowsDalamudRunner : IDalamudRunner
                 throw new DalamudRunnerException("No injector output");
 
             Log.Verbose("=> Reading result");
-
+            
             Process gameProcess;
 
             try
             {
                 Log.Verbose("=> Dalamud.Injector output: {Output}", output);
-                var dalamudConsoleOutput = JsonConvert.DeserializeObject<DalamudConsoleOutput>(output);
+                var dalamudConsoleOutput = JsonSerializer.Deserialize(output, DalamudConsoleOutputJsonContext.Default.DalamudConsoleOutput);
 
                 if (dalamudConsoleOutput.Handle == 0)
                 {
@@ -223,7 +223,7 @@ public class WindowsDalamudRunner : IDalamudRunner
                 if (gameProcess.Id != dalamudConsoleOutput.Pid)
                     Log.Warning($"=> Internal Process ID {gameProcess.Id} does not match Dalamud provided one {dalamudConsoleOutput.Pid}");
             }
-            catch (JsonReaderException ex)
+            catch (Exception ex)
             {
                 Log.Error(ex, $"=> Couldn't parse Dalamud output: {output}");
                 return null;

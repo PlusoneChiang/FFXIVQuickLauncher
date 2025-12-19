@@ -20,6 +20,7 @@ using XIVLauncher.Common.Addon;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.Game;
 using XIVLauncher.Common.Game.Exceptions;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Game.Patch;
 using XIVLauncher.Common.Game.Patch.Acquisition;
 using XIVLauncher.Common.Game.Patch.PatchList;
@@ -42,7 +43,7 @@ namespace XIVLauncher.Windows.ViewModel
 
         public bool IsLoggingIn;
 
-        public Launcher Launcher { get; private set; }
+        public SqexLauncher Launcher { get; private set; }
 
         public AccountManager AccountManager { get; private set; } = new(App.Settings);
 
@@ -81,9 +82,7 @@ namespace XIVLauncher.Windows.ViewModel
             frontierUrl ??= "https://launcher.finalfantasyxiv.com/v650/index.html?rc_lang={0}&time={1}";
 #endif
 
-            Launcher = App.GlobalSteamTicket == null
-                ? new(App.Steam, App.UniqueIdCache, CommonSettings.Instance, frontierUrl)
-                : new(App.GlobalSteamTicket, App.UniqueIdCache, CommonSettings.Instance, frontierUrl);
+            Launcher = new(App.UniqueIdCache, CommonSettings.Instance, frontierUrl);
 
             // Tried and failed to get this from the theme
             var worldStatusBrushOk = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xf3));
@@ -92,19 +91,19 @@ namespace XIVLauncher.Windows.ViewModel
             // Grey out world status icon while deferred check is running
             WorldStatusIconColor = new SolidColorBrush(Color.FromRgb(38, 38, 38));
 
-            this.loginStatusTask = Launcher.GetLoginStatus();
-            this.loginStatusTask.ContinueWith((resultTask) =>
-            {
-                try
-                {
-                    var brushToSet = resultTask.Result.Status ? worldStatusBrushOk : null;
-                    WorldStatusIconColor = brushToSet ?? new SolidColorBrush(Color.FromRgb(242, 24, 24));
-                }
-                catch
-                {
-                    // ignored
-                }
-            });
+            // this.loginStatusTask = Launcher.GetLoginStatus();
+            // this.loginStatusTask.ContinueWith((resultTask) =>
+            // {
+            //     try
+            //     {
+            //         var brushToSet = resultTask.Result.Status ? worldStatusBrushOk : null;
+            //         WorldStatusIconColor = brushToSet ?? new SolidColorBrush(Color.FromRgb(242, 24, 24));
+            //     }
+            //     catch
+            //     {
+            //         // ignored
+            //     }
+            // });
         }
 
         private Action<object> GetLoginFunc(AfterLoginAction action)
@@ -315,67 +314,7 @@ namespace XIVLauncher.Windows.ViewModel
             }
         }
 
-        private async Task<bool> CheckGateStatus()
-        {
-            GateStatus gateStatus = null;
-
-            try
-            {
-                gateStatus = await Launcher.GetGateStatus(App.Settings.Language.GetValueOrDefault(ClientLanguage.English)).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Could not obtain gate status");
-            }
-
-            if (gateStatus == null)
-            {
-                CustomMessageBox.Builder.NewFrom(Loc.Localize("GateUnreachable", "The login servers could not be reached. This usually indicates that the game is under maintenance, or that your connection to the login servers is unstable.\n\nPlease try again later."))
-                                .WithImage(MessageBoxImage.Asterisk)
-                                .WithButtons(MessageBoxButton.OK)
-                                .WithShowHelpLinks(true)
-                                .WithCaption("XIVLauncher")
-                                .WithParentWindow(_window)
-                                .Show();
-
-                return false;
-            }
-
-            if (!gateStatus.Status)
-            {
-                var message = Loc.Localize("GateClosed", "The game is currently under maintenance. Please try again later or see official sources for more information.");
-
-                if (gateStatus.Message != null)
-                {
-                    var gateMessage = gateStatus.Message.Aggregate("", (current, s) => current + s + "\n");
-
-                    if (!string.IsNullOrEmpty(gateMessage))
-                        message = gateMessage;
-                }
-
-                var builder = CustomMessageBox.Builder.NewFrom(message)
-                                              .WithImage(MessageBoxImage.Asterisk)
-                                              .WithButtons(MessageBoxButton.OK)
-                                              .WithCaption("XIVLauncher")
-                                              .WithParentWindow(_window);
-
-                if (gateStatus.News != null && gateStatus.News.Count > 0)
-                {
-                    var description = gateStatus.News.Aggregate("", (current, s) => current + s + "\n");
-
-                    if (!string.IsNullOrEmpty(description))
-                        builder.WithDescription(description);
-                }
-
-                builder.Show();
-
-                return false;
-            }
-
-            return true;
-        }
-
-        private async Task<Launcher.LoginResult> TryLoginToGame(string username, string password, string otp, string recaptchaToken, bool isSteam, AfterLoginAction action)
+        private async Task<LoginResult> TryLoginToGame(string username, string password, string otp, string recaptchaToken, bool isSteam, AfterLoginAction action)
         {
             bool? loginStatus = null;
 
@@ -441,9 +380,9 @@ namespace XIVLauncher.Windows.ViewModel
                 }
 
                 if (action == AfterLoginAction.Repair)
-                    return await this.Launcher.Login(username, password, otp, recaptchaToken, isSteam, false, gamePath, true, App.Settings.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
+                    return await this.Launcher.Login(username, password, otp, recaptchaToken, false, gamePath, true, App.Settings.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
                 else
-                    return await this.Launcher.Login(username, password, otp, recaptchaToken, isSteam, enableUidCache, gamePath, false, App.Settings.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
+                    return await this.Launcher.Login(username, password, otp, recaptchaToken, enableUidCache, gamePath, false, App.Settings.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -570,9 +509,9 @@ namespace XIVLauncher.Windows.ViewModel
             }
         }
 
-        private async Task<bool> TryProcessLoginResult(Launcher.LoginResult loginResult, bool isSteam, AfterLoginAction action)
+        private async Task<bool> TryProcessLoginResult(LoginResult loginResult, bool isSteam, AfterLoginAction action)
         {
-            if (loginResult.State == Launcher.LoginState.NoService)
+            if (loginResult.State == LoginState.NoService)
             {
                 CustomMessageBox.Show(
                     Loc.Localize("LoginNoServiceMessage",
@@ -583,7 +522,7 @@ namespace XIVLauncher.Windows.ViewModel
                 return false;
             }
 
-            if (loginResult.State == Launcher.LoginState.NoTerms)
+            if (loginResult.State == LoginState.NoTerms)
             {
                 CustomMessageBox.Show(
                     Loc.Localize("LoginAcceptTermsMessage",
@@ -593,7 +532,7 @@ namespace XIVLauncher.Windows.ViewModel
                 return false;
             }
 
-            if (loginResult.State == Launcher.LoginState.NeedsPatchBoot)
+            if (loginResult.State == LoginState.NeedsPatchBoot)
             {
                 CustomMessageBox.Show(
                     Loc.Localize("EverythingIsFuckedMessage",
@@ -607,12 +546,12 @@ namespace XIVLauncher.Windows.ViewModel
             {
                 try
                 {
-                    if (loginResult.State == Launcher.LoginState.NeedsPatchGame)
+                    if (loginResult.State == LoginState.NeedsPatchGame)
                     {
                         if (!await RepairGame(loginResult).ConfigureAwait(false))
                             return false;
 
-                        loginResult.State = Launcher.LoginState.Ok;
+                        loginResult.State = LoginState.Ok;
                     }
                     else
                     {
@@ -637,7 +576,7 @@ namespace XIVLauncher.Windows.ViewModel
                 }
             }
 
-            if (loginResult.State == Launcher.LoginState.NeedsPatchGame)
+            if (loginResult.State == LoginState.NeedsPatchGame)
             {
                 if (App.Settings.AskBeforePatchInstall ?? true)
                 {
@@ -656,7 +595,7 @@ namespace XIVLauncher.Windows.ViewModel
                     return false;
                 }
 
-                loginResult.State = Launcher.LoginState.Ok;
+                loginResult.State = LoginState.Ok;
             }
 
             if (action == AfterLoginAction.UpdateOnly)
@@ -669,7 +608,7 @@ namespace XIVLauncher.Windows.ViewModel
                 return false;
             }
 
-            if (CustomMessageBox.AssertOrShowError(loginResult.State == Launcher.LoginState.Ok, "TryProcessLoginResult: loginResult.State should have been Launcher.LoginState.Ok", parentWindow: _window))
+            if (CustomMessageBox.AssertOrShowError(loginResult.State == LoginState.Ok, "TryProcessLoginResult: loginResult.State should have been LoginState.Ok", parentWindow: _window))
                 return false;
 
 #if !DEBUG
@@ -911,7 +850,7 @@ namespace XIVLauncher.Windows.ViewModel
             }
         }
 
-        private async Task<bool> RepairGame(Launcher.LoginResult loginResult)
+        private async Task<bool> RepairGame(LoginResult loginResult)
         {
             var doLogin = false;
             var mutex = new Mutex(false, "XivLauncherIsPatching");
@@ -1056,9 +995,9 @@ namespace XIVLauncher.Windows.ViewModel
             return doLogin;
         }
 
-        private Task<bool> InstallGamePatch(Launcher.LoginResult loginResult)
+        private Task<bool> InstallGamePatch(LoginResult loginResult)
         {
-            if (loginResult.State != Launcher.LoginState.NeedsPatchGame)
+            if (loginResult.State != LoginState.NeedsPatchGame)
                 throw new ArgumentException(@"loginResult.State != Launcher.LoginState.NeedsPatchGame", nameof(loginResult));
 
             if (loginResult.PendingPatches == null)
@@ -1097,7 +1036,7 @@ namespace XIVLauncher.Windows.ViewModel
             Environment.Exit(0);
         }
 
-        public async Task<Process> StartGameAndAddon(Launcher.LoginResult loginResult, bool isSteam, bool forceNoDalamud, bool noThird, bool noPlugins)
+        public async Task<Process> StartGameAndAddon(LoginResult loginResult, bool isSteam, bool forceNoDalamud, bool noThird, bool noPlugins)
         {
             var dalamudLauncher = new DalamudLauncher(new WindowsDalamudRunner(App.DalamudUpdater.Runtime), App.DalamudUpdater, App.Settings.InGameAddonLoadMethod.GetValueOrDefault(DalamudLoadMethod.DllInject),
                 App.Settings.GamePath,
@@ -1174,7 +1113,6 @@ namespace XIVLauncher.Windows.ViewModel
                 loginResult.UniqueId,
                 loginResult.OauthLogin.Region,
                 loginResult.OauthLogin.MaxExpansion,
-                isSteam,
                 App.Settings.AdditionalLaunchArgs,
                 App.Settings.GamePath,
                 App.Settings.Language.GetValueOrDefault(ClientLanguage.English),

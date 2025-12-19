@@ -57,7 +57,7 @@ public class CompatibilityTools
         this.toolDirectory = new DirectoryInfo(Path.Combine(toolsFolder.FullName, "beta"));
         this.dxvkDirectory = new DirectoryInfo(Path.Combine(toolsFolder.FullName, "dxvk"));
 
-        this.logWriter = new StreamWriter(wineSettings.LogFile.FullName);
+        this.logWriter = new StreamWriter(wineSettings.LogFile.FullName, append: true);
 
         if (wineSettings.StartupType == WineStartupType.Managed)
         {
@@ -113,7 +113,14 @@ public class CompatibilityTools
 
     public void EnsurePrefix()
     {
-        RunInPrefix("cmd /c dir %userprofile%/Documents > nul").WaitForExit();
+        var winebootProcess = RunInPrefix("wineboot -u");
+        var psi = new ProcessStartInfo(WineServerPath)
+        {
+            Arguments = "-w"
+        };
+        psi.EnvironmentVariables.Add("WINEPREFIX", Settings.Prefix.FullName);
+        Process.Start(psi);
+        winebootProcess.WaitForExit();
     }
 
     public Process RunInPrefix(string command, string workingDirectory = "", IDictionary<string, string> environment = null, bool redirectOutput = false, bool writeLog = false, bool wineD3D = false)
@@ -232,6 +239,7 @@ public class CompatibilityTools
             try
             {
                 logWriter.WriteLine(errLine.Data);
+                logWriter.Flush();
                 Console.Error.WriteLine(errLine.Data);
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException ||
@@ -255,8 +263,20 @@ public class CompatibilityTools
     {
         var wineDbg = RunInPrefix("winedbg --command \"info proc\"", redirectOutput: true);
         var output = wineDbg.StandardOutput.ReadToEnd();
-        var matchingLines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(l => l.Contains(executableName));
-        return matchingLines.Select(l => int.Parse(l.Substring(1, 8), System.Globalization.NumberStyles.HexNumber)).ToArray();
+        var matchingLines = output
+                            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Where(l => l.Contains(executableName))
+                            .Where(l => l.Length > 8);
+
+        return matchingLines
+               .Select(l => int.TryParse(l.AsSpan(1, 8),
+                   System.Globalization.NumberStyles.HexNumber,
+                   null, out var parsedValue)
+                   ? parsedValue
+                   : (int?)null)
+               .Where(pid => pid.HasValue)
+               .Select(pid => pid.Value)
+               .ToArray();
     }
 
     public Int32 GetProcessId(string executableName)
@@ -270,9 +290,23 @@ public class CompatibilityTools
         var output = wineDbg.StandardOutput.ReadToEnd();
         if (output.Contains("syntax error\n"))
             return 0;
-        var matchingLines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Skip(1).Where(
-            l => int.Parse(l.Substring(1, 8), System.Globalization.NumberStyles.HexNumber) == winePid);
-        var unixPids = matchingLines.Select(l => int.Parse(l.Substring(10, 8), System.Globalization.NumberStyles.HexNumber)).ToArray();
+
+        var matchingLines = output
+                            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Skip(1)
+                            .Where(l => l.Length > 18)
+                            .Where(l => int.TryParse(l.AsSpan(1, 8),
+                                System.Globalization.NumberStyles.HexNumber,
+                                null, out var parsedValue) && parsedValue == winePid)
+                            .Where(l => int.TryParse(l.AsSpan(10, 8),
+                                System.Globalization.NumberStyles.HexNumber,
+                                null, out _));
+
+        var unixPids = matchingLines
+                       .Select(l => int.Parse(l.Substring(10, 8),
+                           System.Globalization.NumberStyles.HexNumber))
+                       .ToArray();
+
         return unixPids.FirstOrDefault();
     }
 
@@ -299,6 +333,6 @@ public class CompatibilityTools
         };
         psi.EnvironmentVariables.Add("WINEPREFIX", Settings.Prefix.FullName);
 
-        Process.Start(psi);
+        Process.Start(psi).WaitForExit();
     }
 }

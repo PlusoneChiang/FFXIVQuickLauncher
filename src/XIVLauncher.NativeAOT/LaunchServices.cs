@@ -14,7 +14,7 @@ using XIVLauncher.Common.Util;
 using XIVLauncher.Common.Windows;
 using XIVLauncher.NativeAOT.Configuration;
 using XIVLauncher.NativeAOT.Support;
-using static XIVLauncher.Common.Game.Launcher;
+using XIVLauncher.Common.Game.Launcher;
 
 namespace XIVLauncher.NativeAOT;
 
@@ -41,11 +41,16 @@ public static class LaunchServices
 
     public static void EnsureLauncherAffinity(License license)
     {
-        _= license switch
+        switch (license)
         {
-            License.Windows => Program.Launcher = new Launcher(steam: null, Program.UniqueIdCache!, Program.CommonSettings, Program.FrontierUrl!),
-            _ => throw new ArgumentOutOfRangeException(nameof(license), license, null)
-        };
+            case License.Windows:
+                PlatformHelpers.IsMac = false;
+                Program.Launcher = new SqexLauncher(Program.UniqueIdCache!, Program.CommonSettings, Program.FrontierUrl!);
+                return;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(license), license, null);
+        }
     }
 
     public static async Task<string> GetBootPatches()
@@ -72,9 +77,9 @@ public static class LaunchServices
             // TC Region don't need check launcher affinity, force set to Windows license
             EnsureLauncherAffinity(License.Windows);
             if (action == LoginAction.Repair)
-                return await Program.Launcher!.Login(username, password, otp, recaptchaToken, false, false, gamePath, true, Program.Config.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
+                return await Program.Launcher!.Login(username, password, otp, recaptchaToken, false, gamePath, true, false).ConfigureAwait(false);
             else
-                return await Program.Launcher!.Login(username, password, otp, recaptchaToken, false, enableUidCache, gamePath, false, Program.Config.IsFt.GetValueOrDefault(false)).ConfigureAwait(false);
+                return await Program.Launcher!.Login(username, password, otp, recaptchaToken, false, gamePath, false, false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -142,7 +147,7 @@ public static class LaunchServices
         switch (Environment.OSVersion.Platform)
         {
             case PlatformID.Win32NT:
-                dalamudRunner = new WindowsDalamudRunner(Program.DalamudUpdater!.Runtime);
+                dalamudRunner = new WindowsDalamudRunner(Program.DalamudUpdater.Runtime);
                 dalamudCompatCheck = new WindowsDalamudCompatibilityCheck();
                 break;
 
@@ -231,7 +236,6 @@ public static class LaunchServices
             loginResult.UniqueId,
             loginResult.OauthLogin.Region,
             loginResult.OauthLogin.MaxExpansion,
-            isSteamServiceAccount: false,
             gameArgs,
             Program.Config.GamePath,
             Program.Config.ClientLanguage.GetValueOrDefault(ClientLanguage.English),

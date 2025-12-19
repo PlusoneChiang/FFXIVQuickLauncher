@@ -7,6 +7,7 @@ using Serilog.Events;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.Game;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Game.Patch.Acquisition;
 using XIVLauncher.Common.Game.Patch.PatchList;
 using XIVLauncher.Common.Patching;
@@ -18,7 +19,6 @@ using XIVLauncher.Common.Windows;
 using XIVLauncher.NativeAOT.Configuration;
 using XIVLauncher.NativeAOT.Support;
 using XIVLauncher.PlatformAbstractions;
-using static XIVLauncher.Common.Game.Launcher;
 using static XIVLauncher.Common.Unix.Compatibility.Dxvk;
 
 namespace XIVLauncher.NativeAOT;
@@ -42,19 +42,17 @@ public class Program
     public static ISteam? Steam { get; private set; }
     public static DalamudUpdater? DalamudUpdater { get; private set; }
     public static CompatibilityTools? CompatibilityTools { get; private set; }
-    public static Launcher? Launcher { get; set; }
+    public static ILauncher? Launcher { get; set; }
     public static CommonUniqueIdCache? UniqueIdCache;
 
     private const uint STEAM_APP_ID = 39210;
     private const uint STEAM_APP_ID_FT = 312060;
-
     // Temporary disable Dalamud auto-update due to compatibility issues
     private static bool isDalamudAutoUpdateDisabled = true;
 
     [UnmanagedCallersOnly(EntryPoint = "initXL")]
-    public static void Init(nint appName, nint storagePath, bool verboseLogging, nint frontierUrl)
+    public static void Init(nint appName, nint storagePath, bool verboseLogging, nint frontierUrl, nint betaKind, nint betaKey)
     {
-        // TODO: TC伺服器的初始設定
         AppName = Marshal.PtrToStringUTF8(appName)!;
         Storage = new Storage(AppName, Marshal.PtrToStringUTF8(storagePath)!);
         FrontierUrl = Marshal.PtrToStringUTF8(frontierUrl)!;
@@ -107,7 +105,7 @@ public class Program
         }
 
         UniqueIdCache = new CommonUniqueIdCache(Storage.GetFile("uidCache.json"));
-        Launcher = new Launcher(steam: null, UniqueIdCache, CommonSettings, FrontierUrl);
+        Launcher = new SqexLauncher(UniqueIdCache, CommonSettings, FrontierUrl);
         // TC Region: force set to windows
         LaunchServices.EnsureLauncherAffinity(License.Windows);
     }
@@ -190,7 +188,7 @@ public class Program
         else
             gameRunner = new UnixGameRunner(Program.CompatibilityTools, null, false);
 
-        Launcher!.LaunchGame(gameRunner, "0", 1, 2, false, "", Program.Config!.GamePath!, ClientLanguage.Japanese, true, DpiAwareness.Unaware);
+        Launcher!.LaunchGame(gameRunner, "0", 1, 2, "", Program.Config!.GamePath!, ClientLanguage.Japanese, true, DpiAwareness.Unaware);
     }
 
     [UnmanagedCallersOnly(EntryPoint = "tryLoginToGame")]
@@ -495,6 +493,19 @@ public class Program
         {
             Log.Warning(ex, "Rosetta does not appear to be installed");
             return false;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "updateDalamud")]
+    public static void UpdateDalamud(nint betaKind, nint betaKey)
+    {
+        try
+        {
+            DalamudUpdater!.Run(Marshal.PtrToStringUTF8(betaKind), Marshal.PtrToStringUTF8(betaKey));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to update Dalamud");
         }
     }
 }

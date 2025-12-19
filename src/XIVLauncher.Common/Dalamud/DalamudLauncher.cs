@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -45,7 +45,7 @@ namespace XIVLauncher.Common.Dalamud
             this.troubleshootingData = troubleshootingData;
         }
 
-        public const string REMOTE_BASE = "https://kamori.goats.dev/Dalamud/Release/VersionInfo?track=";
+        public const string REMOTE_BASE = "https://kamori.goats.dev/Dalamud/Release/VersionInfo?appId=xom&track=";
 
         public DalamudInstallState HoldForUpdate(DirectoryInfo gamePath)
         {

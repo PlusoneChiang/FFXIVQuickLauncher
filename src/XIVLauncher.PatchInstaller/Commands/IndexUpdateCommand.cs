@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using Serilog;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Game;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Game.Patch.Acquisition;
 using XIVLauncher.Common.Game.Patch.PatchList;
 using XIVLauncher.Common.Patching.IndexedZiPatch;
@@ -78,7 +79,7 @@ public class IndexUpdateCommand
 
     private async Task<int> Handle(CancellationToken cancellationToken)
     {
-        var la = new Launcher((ISteam?)null, new CommonUniqueIdCache(null), this.settings, "https://launcher.finalfantasyxiv.com/v650/index.html?rc_lang={0}&time={1}");
+        var la = new SqexLauncher(new CommonUniqueIdCache(null), this.settings, "https://launcher.finalfantasyxiv.com/v650/index.html?rc_lang={0}&time={1}");
 
         var bootPatchListFile = new FileInfo(Path.Combine(this.settings.GamePath.FullName, "bootlist.json"));
 
@@ -97,7 +98,7 @@ public class IndexUpdateCommand
         if (this.username is not null && this.password is not null)
         {
             Log.Information("Logging in and fetching game patch information.");
-            var lr = await la.Login(this.username, this.password, this.otp ?? "", "", false, false, this.settings.GamePath, true, false);
+            var lr = await la.Login(this.username, this.password, this.otp ?? "", "", false, this.settings.GamePath, true, false);
             gamePatchList = lr.PendingPatches;
             File.WriteAllText(gamePatchListFile.FullName, JsonConvert.SerializeObject(gamePatchList, Formatting.Indented));
         }

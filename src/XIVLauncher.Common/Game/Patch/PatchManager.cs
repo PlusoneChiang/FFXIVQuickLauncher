@@ -8,8 +8,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Game.Patch.Acquisition;
-using XIVLauncher.Common.Game.Patch.Acquisition.Aria;
 using XIVLauncher.Common.Game.Patch.PatchList;
 using XIVLauncher.Common.Patching.ZiPatch;
 using XIVLauncher.Common.Util;
@@ -42,7 +42,7 @@ namespace XIVLauncher.Common.Game.Patch
         private readonly DirectoryInfo gamePath;
         private readonly DirectoryInfo patchStore;
         private readonly PatchInstaller installer;
-        private readonly Launcher launcher;
+        private readonly ILauncher launcher;
         private readonly string sid;
 
         private readonly Mutex downloadFinalizationLock = new Mutex();
@@ -78,7 +78,7 @@ namespace XIVLauncher.Common.Game.Patch
 
         public event Action<PatchListEntry, string> OnFail;
 
-        public PatchManager(AcquisitionMethod acquisitionMethod, long speedLimitBytes, Repository repo, IEnumerable<PatchListEntry> patches, DirectoryInfo gamePath, DirectoryInfo patchStore, PatchInstaller installer, Launcher launcher, string sid)
+        public PatchManager(AcquisitionMethod acquisitionMethod, long speedLimitBytes, Repository repo, IEnumerable<PatchListEntry> patches, DirectoryInfo gamePath, DirectoryInfo patchStore, PatchInstaller installer, ILauncher launcher, string sid)
         {
             Debug.Assert(patches != null, "patches != null ASSERTION FAILED");
 
@@ -168,10 +168,6 @@ namespace XIVLauncher.Common.Game.Patch
                     // ignored
                     break;
 
-                case AcquisitionMethod.Aria:
-                    await AriaHttpPatchAcquisition.SetDownloadSpeedLimit(this.speedLimitBytes);
-                    break;
-
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -185,11 +181,7 @@ namespace XIVLauncher.Common.Game.Patch
                 case AcquisitionMethod.NetDownloader:
                     // ignored
                     break;
-
-                case AcquisitionMethod.Aria:
-                    await AriaHttpPatchAcquisition.InitializeAsync(this.speedLimitBytes, aria2LogFile);
-                    break;
-
+                
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -199,7 +191,6 @@ namespace XIVLauncher.Common.Game.Patch
         {
             try
             {
-                await AriaHttpPatchAcquisition.UnInitializeAsync();
             }
             catch (Exception ex)
             {
@@ -233,10 +224,6 @@ namespace XIVLauncher.Common.Game.Patch
 
             switch (this.acquisitionMethod)
             {
-                case AcquisitionMethod.Aria:
-                    acquisition = new AriaHttpPatchAcquisition();
-                    break;
-
                 default:
                     throw new ArgumentOutOfRangeException();
             }

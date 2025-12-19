@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using XIVLauncher.Common.Game.Patch.Acquisition;
-using XIVLauncher.Common.Game.Patch.Acquisition.Aria;
 using XIVLauncher.Common.Game.Patch.PatchList;
 using XIVLauncher.Common.Util;
 
@@ -84,11 +83,13 @@ namespace XIVLauncher.Common.Tests
             completeSignal.WaitOne();
         }
 
+        /*
         [TestMethod]
-        public async Task TestAriaDownload()
+        public async Task TestTorrentDownload()
         {
-            await AriaHttpPatchAcquisition.InitializeAsync(0, new FileInfo("aria2.log"));
-            await TestPatchDownload(new AriaHttpPatchAcquisition());
+            await TorrentPatchAcquisition.InitializeAsync(0);
+            await TestPatchDownload(new TorrentPatchAcquisition());
         }
+        */
     }
 }

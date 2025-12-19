@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Serilog;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
@@ -41,7 +41,7 @@ namespace XIVLauncher.Support
                     Info = exception.ToString(),
                 };
 
-                var encodedPayload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(payload)));
+                var encodedPayload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
                 Log.Information($"LASTEXCEPTION:{encodedPayload}");
             }
             catch (Exception)
@@ -123,7 +123,7 @@ namespace XIVLauncher.Support
                 IndexIntegrity = integrity
             };
 
-            return JsonConvert.SerializeObject(payload);
+            return JsonSerializer.Serialize(payload);
         }
 
         /// <summary>

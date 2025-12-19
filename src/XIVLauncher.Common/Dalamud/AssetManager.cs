@@ -16,7 +16,7 @@ namespace XIVLauncher.Common.Dalamud
 {
     public class AssetManager
     {
-        private const string ASSET_STORE_URL = "https://kamori.goats.dev/Dalamud/Asset/Meta";
+        private const string ASSET_STORE_URL = "https://kamori.goats.dev/Dalamud/Asset/Meta?appId=xom";
 
         internal class AssetInfo
         {
@@ -36,7 +36,7 @@ namespace XIVLauncher.Common.Dalamud
 
                 [JsonPropertyName("fileName")]
                 public string FileName { get; set; }
-
+                
                 [JsonPropertyName("hash")]
                 public string Hash { get; set; }
             }
@@ -182,8 +182,9 @@ namespace XIVLauncher.Common.Dalamud
                 // This means it'll stay on 0, which will redownload all assets - good by me
                 Log.Error(ex, "[DASSET] Could not read asset.ver");
             }
+            
 
-            var remoteVer = JsonSerializer.Deserialize<AssetInfo>(await client.GetStringAsync(ASSET_STORE_URL));
+            var remoteVer = JsonSerializer.Deserialize(await client.GetStringAsync(ASSET_STORE_URL), AssetInfoJsonContext.Default.AssetInfo);
 
             Log.Verbose("[DASSET] Ver check - local:{0} remote:{1}", localVer, remoteVer.Version);
 
@@ -224,5 +225,10 @@ namespace XIVLauncher.Common.Dalamud
 
             Log.Verbose("[DASSET] Finished cleaning");
         }
+    }
+    
+    [JsonSerializable(typeof(AssetManager.AssetInfo))]
+    internal partial class AssetInfoJsonContext: JsonSerializerContext
+    {
     }
 }

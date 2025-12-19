@@ -1,7 +1,7 @@
 ﻿using AdysTech.CredentialManager;
-using Newtonsoft.Json;
 using System.ComponentModel;
 using System.Net;
+using System.Text.Json.Serialization;
 
 namespace XIVLauncher.Accounts
 {

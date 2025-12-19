@@ -1,68 +1,69 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using XIVLauncher.Common.Game.Launcher;
 using XIVLauncher.Common.Util;
 
 namespace XIVLauncher.Common.Game
 {
     public partial class Headlines
     {
-        [JsonProperty("news")]
+        [JsonPropertyName("news")]
         public News[] News { get; set; }
 
-        [JsonProperty("topics")]
+        [JsonPropertyName("topics")]
         public News[] Topics { get; set; }
 
-        [JsonProperty("pinned")]
+        [JsonPropertyName("pinned")]
         public News[] Pinned { get; set; }
     }
 
     public class Banner
     {
-        [JsonProperty("lsb_banner")]
+        [JsonPropertyName("lsb_banner")]
         public Uri LsbBanner { get; set; }
 
-        [JsonProperty("link")]
+        [JsonPropertyName("link")]
         public Uri Link { get; set; }
 
-        [JsonProperty("order_priority")]
+        [JsonPropertyName("order_priority")]
         public int? OrderPriority { get; set; }
 
-        [JsonProperty("fix_order")]
+        [JsonPropertyName("fix_order")]
         public int? FixOrder { get; set; }
     }
 
     public class BannerRoot
     {
-        [JsonProperty("banner")]
+        [JsonPropertyName("banner")]
         public List<Banner> Banner { get; set; }
     }
 
     public class News
     {
-        [JsonProperty("date")]
+        [JsonPropertyName("date")]
         public DateTimeOffset Date { get; set; }
 
-        [JsonProperty("title")]
+        [JsonPropertyName("title")]
         public string Title { get; set; }
 
-        [JsonProperty("url")]
+        [JsonPropertyName("url")]
         public string Url { get; set; }
 
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
 
-        [JsonProperty("tag", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("tag")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string Tag { get; set; }
     }
 
     public partial class Headlines
     {
-        public static async Task<Headlines> GetNews(Launcher game, ClientLanguage language, bool forceNa = false)
+        public static async Task<Headlines> GetNews(ILauncher game, ClientLanguage language, bool forceNa = false)
         {
             var unixTimestamp = ApiHelpers.GetUnixMillis();
             var langCode = language.GetLangCode(forceNa);
@@ -70,7 +71,7 @@ namespace XIVLauncher.Common.Game
 
             var json = Encoding.UTF8.GetString(await game.DownloadAsLauncher(url, language, "application/json, text/plain, */*").ConfigureAwait(false));
 
-            var news = JsonConvert.DeserializeObject<Headlines>(json, Converter.SETTINGS);
+            var news = JsonSerializer.Deserialize<Headlines>(json);
             foreach (var item in news.News)
             {
                 if (string.IsNullOrEmpty(item.Url) && !string.IsNullOrEmpty(item.Id))
@@ -88,7 +89,7 @@ namespace XIVLauncher.Common.Game
             return news;
         }
 
-        public static async Task<IReadOnlyList<Banner>> GetBanners(Launcher game, ClientLanguage language, bool forceNa = false)
+        public static async Task<IReadOnlyList<Banner>> GetBanners(ILauncher game, ClientLanguage language, bool forceNa = false)
         {
             var unixTimestamp = ApiHelpers.GetUnixMillis();
             var langCode = language.GetLangCode(forceNa);
@@ -96,10 +97,10 @@ namespace XIVLauncher.Common.Game
 
             var json = Encoding.UTF8.GetString(await game.DownloadAsLauncher(url, language, "application/json, text/plain, */*").ConfigureAwait(false));
 
-            return JsonConvert.DeserializeObject<BannerRoot>(json, Converter.SETTINGS).Banner;
+            return JsonSerializer.Deserialize<BannerRoot>(json).Banner;
         }
 
-        public static async Task<IReadOnlyCollection<Banner>> GetMessage(Launcher game, ClientLanguage language, bool forceNa = false)
+        public static async Task<IReadOnlyCollection<Banner>> GetMessage(ILauncher game, ClientLanguage language, bool forceNa = false)
         {
             var unixTimestamp = ApiHelpers.GetUnixMillis();
             var langCode = language.GetLangCode(forceNa);
@@ -107,30 +108,17 @@ namespace XIVLauncher.Common.Game
 
             var json = Encoding.UTF8.GetString(await game.DownloadAsLauncher(url, language, "application/json, text/plain, */*").ConfigureAwait(false));
 
-            return JsonConvert.DeserializeObject<BannerRoot>(json, Converter.SETTINGS).Banner;
+            return JsonSerializer.Deserialize<BannerRoot>(json).Banner;
         }
 
-        public static async Task<IReadOnlyCollection<Banner>> GetWorlds(Launcher game, ClientLanguage language)
+        public static async Task<IReadOnlyCollection<Banner>> GetWorlds(ILauncher game, ClientLanguage language)
         {
             var unixTimestamp = ApiHelpers.GetUnixMillis();
             var url = $"https://frontier.ffxiv.com/v2/world/status.json?_={unixTimestamp}";
 
             var json = Encoding.UTF8.GetString(await game.DownloadAsLauncher(url, language, "application/json, text/plain, */*").ConfigureAwait(false));
 
-            return JsonConvert.DeserializeObject<BannerRoot>(json, Converter.SETTINGS).Banner;
+            return JsonSerializer.Deserialize<BannerRoot>(json).Banner;
         }
-    }
-
-    internal static class Converter
-    {
-        public static readonly JsonSerializerSettings SETTINGS = new JsonSerializerSettings
-        {
-            MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
-            DateParseHandling = DateParseHandling.None,
-            Converters =
-            {
-                new IsoDateTimeConverter { DateTimeStyles = DateTimeStyles.AssumeUniversal }
-            }
-        };
     }
 }

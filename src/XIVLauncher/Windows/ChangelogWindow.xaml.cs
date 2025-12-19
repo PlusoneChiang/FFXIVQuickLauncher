@@ -1,15 +1,17 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Media;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Documents;
-using System.Windows.Media;
-using System.Collections.Generic;
-using Newtonsoft.Json;
+using Microsoft.Win32;
+using System.Text.Json;
 using Serilog;
+using XIVLauncher.Common;
 using XIVLauncher.Support;
 using XIVLauncher.Windows.ViewModel;
+using HttpUtility = System.Web.HttpUtility;
+using System.Text.Json.Serialization;
 
 namespace XIVLauncher.Windows
 {
@@ -23,25 +25,25 @@ namespace XIVLauncher.Windows
 
         public class VersionMeta
         {
-            [JsonProperty("version")]
+            [JsonPropertyName("version")]
             public string Version { get; set; }
 
-            [JsonProperty("url")]
+            [JsonPropertyName("url")]
             public string Url { get; set; }
 
-            [JsonProperty("changelog")]
+            [JsonPropertyName("changelog")]
             public string Changelog { get; set; }
 
-            [JsonProperty("when")]
+            [JsonPropertyName("when")]
             public DateTime When { get; set; }
         }
 
         public class ReleaseMeta
         {
-            [JsonProperty("releaseVersion")]
+            [JsonPropertyName("releaseVersion")]
             public VersionMeta ReleaseVersion { get; set; }
 
-            [JsonProperty("prereleaseVersion")]
+            [JsonPropertyName("prereleaseVersion")]
             public VersionMeta PrereleaseVersion { get; set; }
         }
 
@@ -57,7 +59,7 @@ namespace XIVLauncher.Windows
             var vm = new ChangeLogWindowViewModel();
             DataContext = vm;
 
-            ChangeLogViewer.Document = BuildFlowDocumentFromPlainText(vm.ChangelogLoadingLoc);
+            // this.ChangeLogText.Text = vm.ChangelogLoadingLoc;
 
             Activate();
             Topmost = true;
@@ -74,131 +76,63 @@ namespace XIVLauncher.Windows
         {
             Close();
         }
-
+        
         public new void Show()
         {
-            LoadChangelog();
-
             SystemSounds.Asterisk.Play();
             base.Show();
+
+            LoadChangelog();
         }
 
         public new void ShowDialog()
         {
-            LoadChangelog();
-
             base.ShowDialog();
+            
+            LoadChangelog();
         }
-
+        
         private void LoadChangelog()
         {
-            var _ = Task.Run(this.FetchChangelogAsync);
-        }
+            var _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var client = new HttpClient();
+                    var response = JsonSerializer.Deserialize<ReleaseMeta>(await client.GetStringAsync(META_URL));
 
-        private async Task FetchChangelogAsync()
+                    // Dispatcher.Invoke(() => this.ChangeLogText.Text = _prerelease ? response.PrereleaseVersion.Changelog : response.ReleaseVersion.Changelog);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Could not get changelog");
+                    // Dispatcher.Invoke(() => this.ChangeLogText.Text = Model.ChangelogLoadingErrorLoc);
+                }
+            });
+        }
+        
+        private void EmailButton_OnClick(object sender, RoutedEventArgs e)
         {
+            // Try getting the Windows 10 "build", e.g. 1909
+            var releaseId = "???";
             try
             {
-                using var client = new HttpClient();
-                var response = JsonConvert.DeserializeObject<ReleaseMeta>(await client.GetStringAsync(META_URL));
-
-                var text = _prerelease ? response.PrereleaseVersion?.Changelog : response.ReleaseVersion?.Changelog;
-                Dispatcher.Invoke(() => ChangeLogViewer.Document = BuildFlowDocumentFromPlainText(text));
+                releaseId = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                    "ReleaseId", "").ToString();
             }
-            catch (Exception ex)
+            catch
             {
-                Log.Error(ex, "Could not get changelog");
-                Dispatcher.Invoke(() => ChangeLogViewer.Document = BuildFlowDocumentFromPlainText(Model.ChangelogLoadingErrorLoc));
-            }
-        }
-
-        private FlowDocument BuildFlowDocumentFromPlainText(string text)
-        {
-            var doc = new FlowDocument
-            {
-                FontFamily = new FontFamily("pack://application:,,,/MaterialDesignThemes.Wpf;component/Resources/Roboto/#Roboto"),
-                FontSize = 12,
-                PagePadding = new Thickness(0),
-                ColumnWidth = double.PositiveInfinity // don't flow into newspaper columns
-            };
-
-            if (string.IsNullOrEmpty(text))
-                return doc;
-
-            // Normalize line endings
-            var normalized = text.Replace("\r\n", "\n").Replace("\r", "\n");
-            var lines = normalized.Split('\n');
-
-            List currentList = null;
-            var paraLines = new List<string>();
-
-            foreach (var raw in lines)
-            {
-                if (string.IsNullOrWhiteSpace(raw))
-                {
-                    // Empty line -> flush current list or paragraph
-                    if (currentList != null)
-                    {
-                        doc.Blocks.Add(currentList);
-                        currentList = null;
-                    }
-
-                    if (paraLines.Count > 0)
-                    {
-                        var p = new Paragraph(new Run(string.Join(" ", paraLines)));
-                        p.Margin = new Thickness(0, 0, 0, 8);
-                        doc.Blocks.Add(p);
-                        paraLines.Clear();
-                    }
-
-                    continue;
-                }
-
-                var trimmedStart = raw.TrimStart();
-                if (trimmedStart.StartsWith('*'))
-                {
-                    // Flush paragraph buffer
-                    if (paraLines.Count > 0)
-                    {
-                        var p = new Paragraph(new Run(string.Join(" ", paraLines)));
-                        p.Margin = new Thickness(0, 0, 0, 8);
-                        doc.Blocks.Add(p);
-                        paraLines.Clear();
-                    }
-
-                    // Start a new list if needed
-                    currentList ??= new List
-                    {
-                        MarkerStyle = TextMarkerStyle.Disc,
-                        Margin = new Thickness(6, 0, 0, 8),
-                        MarkerOffset = 15
-                    };
-
-                    var itemText = trimmedStart.TrimStart('*').Trim();
-                    var itemPara = new Paragraph(new Run(itemText)) { Margin = new Thickness(0, 0, 0, 4) };
-                    currentList.ListItems.Add(new ListItem(itemPara));
-                }
-                else
-                {
-                    // Normal text line, accumulate into paragraph
-                    paraLines.Add(raw.Trim());
-                }
+                // ignored
             }
 
-            // Flush remaining buffers
-            if (currentList != null)
-                doc.Blocks.Add(currentList);
+            var os = HttpUtility.HtmlEncode($"{Environment.OSVersion} - {releaseId} ({Environment.Version})");
+            var lang = HttpUtility.HtmlEncode(App.Settings.LauncherLanguage.GetValueOrDefault(LauncherLanguage.English)
+                .ToString());
+            var wine = EnvironmentSettings.IsWine ? "Yes" : "No";
 
-            if (paraLines.Count > 0)
-            {
-                var p = new Paragraph(new Run(string.Join(" ", paraLines)));
-                p.Margin = new Thickness(0, 0, 0, 8);
-                doc.Blocks.Add(p);
-            }
-
-            return doc;
+            Process.Start(string.Format(
+                "mailto:goatsdev@protonmail.com?subject=XIVLauncher%20Feedback&body=This%20is%20my%20XIVLauncher%20Feedback.%0A%0AMy%20OS%3A%0D{0}%0ALauncher%20Language%3A%0D{1}%0ARunning%20on%20Wine%3A%0D{2}",
+                os, lang, wine));
         }
     }
 }
-
-
