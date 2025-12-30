@@ -12,6 +12,8 @@ using System.Text.Json;
 using Serilog;
 using XIVLauncher.Common.PlatformAbstractions;
 using XIVLauncher.Common.Util;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 #nullable enable
 
@@ -189,6 +191,20 @@ namespace XIVLauncher.Common.Dalamud
             {
                 NoCache = true,
             };
+
+            // 檢查 betaKey 是否為自訂 URL（以 http:// 或 https:// 開頭）
+            if (!string.IsNullOrEmpty(betaKey) && (betaKey.StartsWith("http://") || betaKey.StartsWith("https://")))
+            {
+                Log.Information("[DUPDATE] Using custom version URL: {Url}", betaKey);
+                var customVersionJson = await client.GetStringAsync(betaKey).ConfigureAwait(false);
+                var customVersion = JsonSerializer.Deserialize(customVersionJson, DalamudJsonContext.Default.DalamudVersionInfo);
+                
+                if (customVersion == null)
+                    throw new DalamudIntegrityException("Failed to parse custom version JSON");
+                
+                Log.Information("[DUPDATE] Successfully loaded custom version: {Version}", customVersion.AssemblyVersion);
+                return (customVersion, null);
+            }
 
             var versionInfoJsonRelease = await client.GetStringAsync(DalamudLauncher.REMOTE_BASE + $"release&bucket={this.RolloutBucket}").ConfigureAwait(false);
 
@@ -463,7 +479,13 @@ namespace XIVLauncher.Common.Dalamud
                 File.Delete(downloadPath);
 
             await this.DownloadFile(version.DownloadUrl, downloadPath, this.defaultTimeout).ConfigureAwait(false);
-            ZipFile.ExtractToDirectory(downloadPath, addonPath.FullName);
+            using (var archive = ArchiveFactory.Open(downloadPath))
+            {
+                foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                {
+                    entry.WriteToDirectory(addonPath.FullName, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
+                }
+            }
 
             File.Delete(downloadPath);
 

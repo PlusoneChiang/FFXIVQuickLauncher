@@ -54,5 +54,6 @@
         <PackageReference Include="System.Text.Json" Version="9.0.2" />
         <PackageReference Update="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
         <PackageReference Update="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" />
+        <PackageReference Include="SharpCompress" Version="0.42.1" />
     </ItemGroup>
 </Project>
