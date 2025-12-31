@@ -22,7 +22,7 @@ namespace XIVLauncher.Common
                 ClientLanguage.English => "en-gb",
                 ClientLanguage.German => "de",
                 ClientLanguage.French => "fr",
-                ClientLanguage.TraditionalChinese => "zh",
+                ClientLanguage.TraditionalChinese => "zh-tw",
                 _ => "en-gb",
             };
         }

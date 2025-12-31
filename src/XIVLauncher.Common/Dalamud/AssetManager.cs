@@ -16,7 +16,7 @@ namespace XIVLauncher.Common.Dalamud
 {
     public class AssetManager
     {
-        private const string ASSET_STORE_URL = "https://kamori.goats.dev/Dalamud/Asset/Meta?appId=xom";
+        private const string ASSET_STORE_URL = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
 
         internal class AssetInfo
         {
@@ -117,26 +117,49 @@ namespace XIVLauncher.Common.Dalamud
 
                 if (File.Exists(tempPath))
                     File.Delete(tempPath);
-
-                await updater.DownloadFile(packageUrl, tempPath, TimeSpan.FromMinutes(4));
-
-                using (var packageStream = File.OpenRead(tempPath))
-                using (var packageArc = new ZipArchive(packageStream, ZipArchiveMode.Read))
+                if (packageUrl != null)
                 {
-                    packageArc.ExtractToDirectory(currentDir.FullName);
-                }
+                    await updater.DownloadFile(packageUrl, tempPath, TimeSpan.FromMinutes(4));
+                    using (var packageStream = File.OpenRead(tempPath))
+                    using (var packageArc = new ZipArchive(packageStream, ZipArchiveMode.Read))
+                    {
+                        packageArc.ExtractToDirectory(currentDir.FullName);
+                    }
 
-                try
-                {
-                    PlatformHelpers.DeleteAndRecreateDirectory(devDir);
-                    PlatformHelpers.CopyFilesRecursively(currentDir, devDir);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "[DASSET] Could not copy to dev dir");
-                }
+                    try
+                    {
+                        PlatformHelpers.DeleteAndRecreateDirectory(devDir);
+                        PlatformHelpers.CopyFilesRecursively(currentDir, devDir);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[DASSET] Could not copy to dev dir");
+                    }
 
-                File.Delete(tempPath);
+                    File.Delete(tempPath);
+                }
+                else
+                {
+                    using var assetClient = new HttpClient
+                    {
+                        Timeout = TimeSpan.FromMinutes(30),
+                    };
+
+                    assetClient.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
+                    {
+                        NoCache = true,
+                    };
+
+                    foreach (var entry in info.Assets)
+                    {
+                        var destPath = Path.Combine(currentDir.FullName, entry.FileName);
+                        var destDir = Path.GetDirectoryName(destPath);
+                        if (!Directory.Exists(destDir))
+                            Directory.CreateDirectory(destDir);
+
+                        await updater.DownloadFile(entry.Url, destPath, TimeSpan.FromMinutes(4));
+                    }
+                }
             }
 
             if (isRefreshNeeded)

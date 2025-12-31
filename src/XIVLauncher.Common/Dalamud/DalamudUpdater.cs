@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -12,8 +10,8 @@ using System.Text.Json;
 using Serilog;
 using XIVLauncher.Common.PlatformAbstractions;
 using XIVLauncher.Common.Util;
-using SharpCompress.Archives;
 using SharpCompress.Common;
+using SharpCompress.Readers;
 
 #nullable enable
 
@@ -182,6 +180,8 @@ namespace XIVLauncher.Common.Dalamud
 
         private async Task<(DalamudVersionInfo release, DalamudVersionInfo? staging)> GetVersionInfo(string? betaKind, string? betaKey)
         {
+            Log.Information("[DUPDATE] GetVersionInfo started");
+            
             using var client = new HttpClient
             {
                 Timeout = this.defaultTimeout,
@@ -192,46 +192,60 @@ namespace XIVLauncher.Common.Dalamud
                 NoCache = true,
             };
 
-            // 檢查 betaKey 是否為自訂 URL（以 http:// 或 https:// 開頭）
-            if (!string.IsNullOrEmpty(betaKey) && (betaKey.StartsWith("http://") || betaKey.StartsWith("https://")))
+            // ===== 使用自訂 Dalamud 版本來源（用於不相容官方版本的遊戲版本）=====
+            var customVersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
+            Log.Information("[DUPDATE] Using custom Dalamud source: {Url}", customVersionUrl);
+            Log.Information("[DUPDATE] Starting HTTP request...");
+            
+            var customVersionJson = await client.GetStringAsync(customVersionUrl).ConfigureAwait(false);
+            Log.Information("[DUPDATE] HTTP request completed, JSON length: {Length}", customVersionJson?.Length ?? 0);
+            
+            var customVersion = JsonSerializer.Deserialize(customVersionJson, DalamudJsonContext.Default.DalamudVersionInfo);
+            Log.Information("[DUPDATE] JSON deserialized successfully");
+            
+            if (customVersion == null)
             {
-                Log.Information("[DUPDATE] Using custom version URL: {Url}", betaKey);
-                var customVersionJson = await client.GetStringAsync(betaKey).ConfigureAwait(false);
-                var customVersion = JsonSerializer.Deserialize(customVersionJson, DalamudJsonContext.Default.DalamudVersionInfo);
-                
-                if (customVersion == null)
-                    throw new DalamudIntegrityException("Failed to parse custom version JSON");
-                
-                Log.Information("[DUPDATE] Successfully loaded custom version: {Version}", customVersion.AssemblyVersion);
-                return (customVersion, null);
+                Log.Error("[DUPDATE] customVersion is null after deserialization");
+                throw new DalamudIntegrityException("Failed to parse custom Dalamud version JSON");
             }
+            
+            Log.Information("[DUPDATE] Loaded custom Dalamud version: {Version} for game {GameVer}", 
+                customVersion.AssemblyVersion, customVersion.SupportedGameVer);
+            
+            return (customVersion, null);
+            // ===== 結束自訂來源 =====
 
+            /* ===== 官方來源已註解（使用自訂版本） =====
             var versionInfoJsonRelease = await client.GetStringAsync(DalamudLauncher.REMOTE_BASE + $"release&bucket={this.RolloutBucket}").ConfigureAwait(false);
 
             DalamudVersionInfo versionInfoRelease = JsonSerializer.Deserialize(versionInfoJsonRelease, DalamudJsonContext.Default.DalamudVersionInfo);
+            
+            if (versionInfoRelease == null)
+                throw new DalamudIntegrityException("Failed to parse official version JSON");
 
             DalamudVersionInfo? versionInfoStaging = null;
 
             if (!string.IsNullOrEmpty(betaKey))
             {
-                var versionInfoJsonStaging = await client.GetAsync(DalamudLauncher.REMOTE_BASE + GetBetaTrackName(betaKind)).ConfigureAwait(false);
+                var versionInfoJsonStaging = await client.GetAsync(DalamudLauncher.REMOTE_BASE + GetBetaTrackName(betaKind ?? "")).ConfigureAwait(false);
 
                 if (versionInfoJsonStaging.StatusCode != HttpStatusCode.BadRequest)
                     versionInfoStaging = JsonSerializer.Deserialize(await versionInfoJsonStaging.Content.ReadAsStringAsync().ConfigureAwait(false), DalamudJsonContext.Default.DalamudVersionInfo);
             }
 
             return (versionInfoRelease, versionInfoStaging);
+            ===== 結束官方來源註解 ===== */
         }
 
         private async Task UpdateDalamud(string? betaKind, string? betaKey)
         {
-            // GitHub requires TLS 1.2, we need to hardcode this for Windows 7
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
             var (versionInfoRelease, versionInfoStaging) = await GetVersionInfo(betaKind, betaKey).ConfigureAwait(false);
 
+            // 直接使用返回的版本（已經是自訂版本）
             var remoteVersionInfo = versionInfoRelease;
+            Log.Information("[DUPDATE] Using Dalamud version: {Version}", remoteVersionInfo.AssemblyVersion);
 
+            /* ===== Staging 判斷邏輯已註解（使用自訂版本） =====
             if (versionInfoStaging?.Key != null && versionInfoStaging.Key == betaKey)
             {
                 remoteVersionInfo = versionInfoStaging;
@@ -242,6 +256,7 @@ namespace XIVLauncher.Common.Dalamud
             {
                 Log.Information("[DUPDATE] Using release version ({Hash})", remoteVersionInfo.AssemblyVersion);
             }
+            ===== 結束 Staging 判斷註解 ===== */
 
             // Update resolved branch to reflect what the server actually selected
             this.ResolvedBranch = remoteVersionInfo;
@@ -284,27 +299,29 @@ namespace XIVLauncher.Common.Dalamud
                 var versionFile = new FileInfo(Path.Combine(this.Runtime.FullName, "version"));
                 var localVersion = GetLocalRuntimeVersion(versionFile);
 
+                Log.Information("[DUPDATE] Local runtime version: {Version}", localVersion);
+
                 var runtimeNeedsUpdate = localVersion != remoteVersionInfo.RuntimeVersion;
 
                 if (!this.Runtime.Exists)
                     Directory.CreateDirectory(this.Runtime.FullName);
 
-                var isRuntimeIntegrity = false;
+                // var isRuntimeIntegrity = true;
 
                 // Only check runtime hashes if we don't need to update it
-                if (!runtimeNeedsUpdate)
-                {
-                    try
-                    {
-                        isRuntimeIntegrity = await CheckRuntimeHashes(Runtime, localVersion).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "[DUPDATE] Could not check runtime integrity.");
-                    }
-                }
+                // if (!runtimeNeedsUpdate)
+                // {
+                //     try
+                //     {
+                //         isRuntimeIntegrity = await CheckRuntimeHashes(Runtime, localVersion).ConfigureAwait(false);
+                //     }
+                //     catch (Exception ex)
+                //     {
+                //         Log.Error(ex, "[DUPDATE] Could not check runtime integrity.");
+                //     }
+                // }
 
-                if (runtimePaths.Any(p => !p.Exists) || runtimeNeedsUpdate || !isRuntimeIntegrity)
+                if (runtimePaths.Any(p => !p.Exists) || runtimeNeedsUpdate)
                 {
                     Log.Information("[DUPDATE] Not found, outdated or no integrity: {LocalVer} - {RemoteVer}", localVersion, remoteVersionInfo.RuntimeVersion);
 
@@ -464,30 +481,45 @@ namespace XIVLauncher.Common.Dalamud
 
         private async Task DownloadDalamud(DirectoryInfo addonPath, DalamudVersionInfo version)
         {
+            Log.Information("[DUPDATE] DownloadDalamud started, URL: {Url}", version.DownloadUrl);
+            
             // Ensure directory exists
             if (!addonPath.Exists)
+            {
+                Log.Information("[DUPDATE] Creating addon directory: {Path}", addonPath.FullName);
                 addonPath.Create();
+            }
             else
             {
+                Log.Information("[DUPDATE] Deleting existing addon directory: {Path}", addonPath.FullName);
                 addonPath.Delete(true);
                 addonPath.Create();
             }
 
             var downloadPath = PlatformHelpers.GetTempFileName();
+            Log.Information("[DUPDATE] Download temp path: {Path}", downloadPath);
 
             if (File.Exists(downloadPath))
                 File.Delete(downloadPath);
 
+            Log.Information("[DUPDATE] Starting file download...");
             await this.DownloadFile(version.DownloadUrl, downloadPath, this.defaultTimeout).ConfigureAwait(false);
-            using (var archive = ArchiveFactory.Open(downloadPath))
+            Log.Information("[DUPDATE] File download completed, size: {Size} bytes", new FileInfo(downloadPath).Length);
+            Log.Information("[DUPDATE] File download completed, size: {Size} bytes", new FileInfo(downloadPath).Length);
+            
+            Log.Information("[DUPDATE] Starting archive extraction...");
+            using (var archive = ReaderFactory.Open(downloadPath))
             {
-                foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                await archive.WriteAllToDirectoryAsync(addonPath.FullName, new ExtractionOptions()
                 {
-                    entry.WriteToDirectory(addonPath.FullName, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
-                }
+                    ExtractFullPath = true,  // 保留原始路徑結構
+                    Overwrite = true         // 同名檔案覆寫
+                });
             }
+            Log.Information("[DUPDATE] Archive extraction completed");
 
             File.Delete(downloadPath);
+            Log.Information("[DUPDATE] Temp file deleted");
 
             try
             {
@@ -566,8 +598,12 @@ namespace XIVLauncher.Common.Dalamud
             // Wait for it to be gone, thanks Windows
             Thread.Sleep(1000);
 
-            var dotnetUrl = $"https://kamori.goats.dev/Dalamud/Release/Runtime/DotNet/{version}";
-            var desktopUrl = $"https://kamori.goats.dev/Dalamud/Release/Runtime/WindowsDesktop/{version}";
+            // var dotnetUrl = $"https://kamori.goats.dev/Dalamud/Release/Runtime/DotNet/{version}";
+            // var desktopUrl = $"https://kamori.goats.dev/Dalamud/Release/Runtime/WindowsDesktop/{version}";
+
+
+            var dotnetUrl = $"https://dotnetcli.azureedge.net/dotnet/Runtime/{version}/dotnet-runtime-{version}-win-x64.zip";
+            var desktopUrl = $"https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{version}/windowsdesktop-runtime-{version}-win-x64.zip";
 
             var downloadPath = PlatformHelpers.GetTempFileName();
 
@@ -575,11 +611,18 @@ namespace XIVLauncher.Common.Dalamud
                 File.Delete(downloadPath);
 
             await this.DownloadFile(dotnetUrl, downloadPath, this.defaultTimeout).ConfigureAwait(false);
-            ZipFile.ExtractToDirectory(downloadPath, runtimePath.FullName);
+            using (var runtimeFile = File.Open(downloadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var runtimeZip = ReaderFactory.Open(runtimeFile))
+            {
+                await runtimeZip.WriteAllToDirectoryAsync(runtimePath.FullName, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
+            }
 
             await this.DownloadFile(desktopUrl, downloadPath, this.defaultTimeout).ConfigureAwait(false);
-            ZipFile.ExtractToDirectory(downloadPath, runtimePath.FullName);
-
+            using (var desktopFile = File.Open(downloadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var desktopZip = ReaderFactory.Open(desktopFile))
+            {
+                await desktopZip.WriteAllToDirectoryAsync(runtimePath.FullName, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
+            }
             File.Delete(downloadPath);
         }
 
@@ -589,6 +632,8 @@ namespace XIVLauncher.Common.Dalamud
             {
                 url = url.Replace("/File/Get/", "/File/GetProxy/");
             }
+            
+            Log.Information("[DUPDATE] Starting download from {Url} to {Path}", url, path);
 
             using var downloader = new HttpClientDownloadWithProgress(url, path);
             downloader.ProgressChanged += this.ReportOverlayProgress;

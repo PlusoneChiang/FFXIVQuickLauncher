@@ -40,6 +40,7 @@ public class UnixDalamudRunner : IDalamudRunner
 
         environment.Add("DALAMUD_RUNTIME", dotnetRuntimePath);
         environment.Add("DOTNET_ROOT", dotnetRuntimePath);
+        Log.Information("[DALAMUD] Using DOTNET_ROOT: {DotnetRoot}", dotnetRuntimePath);
 
         var launchArguments = new List<string>
         {
@@ -56,6 +57,7 @@ public class UnixDalamudRunner : IDalamudRunner
             DalamudInjectorArgs.DelayInitialize(startInfo.DelayInitializeMs),
             DalamudInjectorArgs.TsPackB64(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(startInfo.TroubleshootingPackData))),
         };
+        Log.Information("[DALAMUD] Launch arguments: {Args}", string.Join(" ", launchArguments));
 
         if (loadMethod == DalamudLoadMethod.ACLonly)
             launchArguments.Add(DalamudInjectorArgs.WITHOUT_DALAMUD);

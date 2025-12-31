@@ -161,7 +161,7 @@ public static class LaunchServices
         }
 
         var dalamudLauncher = new DalamudLauncher(dalamudRunner, Program.DalamudUpdater, Program.Config!.DalamudLoadMethod.GetValueOrDefault(DalamudLoadMethod.DllInject),
-                                                  Program.Config.GamePath, Program.Storage!.Root, Program.Storage!.GetFolder("logs"), Program.Config.ClientLanguage ?? ClientLanguage.English,
+                                                  Program.Config.GamePath, Program.Storage!.Root, Program.Storage!.GetFolder("logs"), ClientLanguage.TraditionalChinese,
                                                   Program.Config.DalamudLoadDelay, false, false,
                                                   false, Troubleshooting.GetTroubleshootingJson());
 
@@ -203,7 +203,7 @@ public static class LaunchServices
         };
 
         var dalamudLauncher = new DalamudLauncher(dalamudRunner, Program.DalamudUpdater, Program.Config!.DalamudLoadMethod.GetValueOrDefault(DalamudLoadMethod.DllInject),
-            Program.Config.GamePath, Program.Storage!.Root, Program.Storage!.GetFolder("logs"), Program.Config.ClientLanguage ?? ClientLanguage.English, Program.Config.DalamudLoadDelay, false, false, 
+            Program.Config.GamePath, Program.Storage!.Root, Program.Storage!.GetFolder("logs"), ClientLanguage.TraditionalChinese, Program.Config.DalamudLoadDelay, false, false, 
             false, Troubleshooting.GetTroubleshootingJson());
 
         IGameRunner runner;
@@ -238,7 +238,7 @@ public static class LaunchServices
             loginResult.OauthLogin.MaxExpansion,
             gameArgs,
             Program.Config.GamePath,
-            Program.Config.ClientLanguage.GetValueOrDefault(ClientLanguage.English),
+            ClientLanguage.TraditionalChinese,
             Program.Config.IsEncryptArgs.GetValueOrDefault(true),
             DpiAwareness.Unaware);
 

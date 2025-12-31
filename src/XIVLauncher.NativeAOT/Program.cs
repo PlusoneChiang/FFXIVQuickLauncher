@@ -48,7 +48,7 @@ public class Program
     private const uint STEAM_APP_ID = 39210;
     private const uint STEAM_APP_ID_FT = 312060;
     // Temporary disable Dalamud auto-update due to compatibility issues
-    private static bool isDalamudAutoUpdateDisabled = true;
+    private static bool isDalamudAutoUpdateDisabled = false;
 
     [UnmanagedCallersOnly(EntryPoint = "initXL")]
     public static void Init(nint appName, nint storagePath, bool verboseLogging, nint frontierUrl, nint betaKind, nint betaKey)
