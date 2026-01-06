@@ -223,12 +223,8 @@ public class Program
     [UnmanagedCallersOnly(EntryPoint = "getUserAgent")]
     public static nint GetUserAgent()
     {
-        // TODO: TC伺服器的User-Agent
-        // return MarshalUtf8.StringToHGlobal(Launcher!.GenerateUserAgent());
-        // return MarshalUtf8.StringToHGlobal("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/");
-
         // Use WebView2-like User-Agent to improve reCAPTCHA trust level
-        return MarshalUtf8.StringToHGlobal("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
+        return MarshalUtf8.StringToHGlobal("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0");
     }
 
     [UnmanagedCallersOnly(EntryPoint = "getPatcherUserAgent")]
