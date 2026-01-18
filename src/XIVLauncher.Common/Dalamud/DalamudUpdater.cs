@@ -522,15 +522,19 @@ namespace XIVLauncher.Common.Dalamud
             if (is7z)
             {
                 Log.Information("[DUPDATE] Detected 7z archive, using SevenZipArchive...");
-                using var fileStream = File.OpenRead(downloadPath);
+                using var fileStream = new FileStream(downloadPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 262144, FileOptions.SequentialScan); // 256KB buffer
                 using var archive = SevenZipArchive.Open(fileStream);
-                foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
+                using var reader = archive.ExtractAllEntries();
+                while (reader.MoveToNextEntry())
                 {
-                    entry.WriteToDirectory(addonPath.FullName, new ExtractionOptions()
+                    if (!reader.Entry.IsDirectory)
                     {
-                        ExtractFullPath = true,
-                        Overwrite = true
-                    });
+                        reader.WriteEntryToDirectory(addonPath.FullName, new ExtractionOptions
+                        {
+                            ExtractFullPath = true,
+                            Overwrite = true
+                        });
+                    }
                 }
             }
             else
