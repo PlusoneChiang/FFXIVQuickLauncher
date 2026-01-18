@@ -12,6 +12,8 @@ using XIVLauncher.Common.PlatformAbstractions;
 using XIVLauncher.Common.Util;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using SharpCompress.Archives;
+using SharpCompress.Archives.SevenZip;
 
 #nullable enable
 
@@ -145,18 +147,21 @@ namespace XIVLauncher.Common.Dalamud
                 {
                     try
                     {
-                        await UpdateDalamud(betaKind, betaKey).ConfigureAwait(true);
+                        Log.Information("[DUPDATE] Starting UpdateDalamud attempt {TryCnt}/{MaxTries}...", tries + 1, MAX_TRIES);
+                        await UpdateDalamud(betaKind, betaKey).ConfigureAwait(false);
                         isUpdated = true;
+                        Log.Information("[DUPDATE] UpdateDalamud completed successfully");
                         break;
                     }
                     catch (Exception ex)
                     {
-                        Log.Error(ex, "[DUPDATE] Update failed, try {TryCnt}/{MaxTries}...", tries, MAX_TRIES);
+                        Log.Error(ex, "[DUPDATE] Update failed, try {TryCnt}/{MaxTries}...", tries + 1, MAX_TRIES);
                         this.EnsurementException = ex;
                         this.forceProxy = true;
                     }
                 }
 
+                Log.Information("[DUPDATE] Setting state to {State}", isUpdated ? "Done" : "NoIntegrity");
                 this.State = isUpdated ? DownloadState.Done : DownloadState.NoIntegrity;
             });
         }
@@ -280,7 +285,7 @@ namespace XIVLauncher.Common.Dalamud
 
                 try
                 {
-                    await DownloadDalamud(currentVersionPath, remoteVersionInfo).ConfigureAwait(true);
+                    await DownloadDalamud(currentVersionPath, remoteVersionInfo).ConfigureAwait(false);
                     CleanUpOld(addonPath, remoteVersionInfo.AssemblyVersion);
 
                     // This is a good indicator that we should clear the UID cache
@@ -340,7 +345,7 @@ namespace XIVLauncher.Common.Dalamud
                 }
             }
 
-            Log.Verbose("[DUPDATE] Now ensure assets...");
+            Log.Information("[DUPDATE] Now ensure assets...");
 
             var assetVer = 0;
 
@@ -348,7 +353,9 @@ namespace XIVLauncher.Common.Dalamud
             {
                 this.SetOverlayProgress(IDalamudLoadingOverlay.DalamudUpdateStep.Assets);
                 this.ReportOverlayProgress(null, 0, null);
-                var assetResult = await AssetManager.EnsureAssets(this, this.assetRootDirectory).ConfigureAwait(true);
+                Log.Information("[DUPDATE] Calling AssetManager.EnsureAssets...");
+                var assetResult = await AssetManager.EnsureAssets(this, this.assetRootDirectory).ConfigureAwait(false);
+                Log.Information("[DUPDATE] AssetManager.EnsureAssets completed");
                 AssetDirectory = assetResult.AssetDir;
                 assetVer = assetResult.Version;
             }
@@ -508,12 +515,32 @@ namespace XIVLauncher.Common.Dalamud
             Log.Information("[DUPDATE] File download completed, size: {Size} bytes", new FileInfo(downloadPath).Length);
             
             Log.Information("[DUPDATE] Starting archive extraction...");
-            using (var archive = ReaderFactory.Open(downloadPath))
+
+            // 檢查檔案類型，7z 需要使用 SevenZipArchive
+            var is7z = version.DownloadUrl.EndsWith(".7z", StringComparison.OrdinalIgnoreCase);
+
+            if (is7z)
             {
+                Log.Information("[DUPDATE] Detected 7z archive, using SevenZipArchive...");
+                using var fileStream = File.OpenRead(downloadPath);
+                using var archive = SevenZipArchive.Open(fileStream);
+                foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
+                {
+                    entry.WriteToDirectory(addonPath.FullName, new ExtractionOptions()
+                    {
+                        ExtractFullPath = true,
+                        Overwrite = true
+                    });
+                }
+            }
+            else
+            {
+                Log.Information("[DUPDATE] Using ReaderFactory for standard archive...");
+                using var archive = ReaderFactory.Open(downloadPath);
                 await archive.WriteAllToDirectoryAsync(addonPath.FullName, new ExtractionOptions()
                 {
-                    ExtractFullPath = true,  // 保留原始路徑結構
-                    Overwrite = true         // 同名檔案覆寫
+                    ExtractFullPath = true,
+                    Overwrite = true
                 });
             }
             Log.Information("[DUPDATE] Archive extraction completed");

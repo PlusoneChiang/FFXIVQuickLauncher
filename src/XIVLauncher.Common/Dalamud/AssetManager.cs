@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Serilog;
@@ -17,6 +18,31 @@ namespace XIVLauncher.Common.Dalamud
     public class AssetManager
     {
         private const string ASSET_STORE_URL = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
+
+        /// <summary>
+        /// 將 GitHub Raw URL 轉換為 jsDelivr CDN URL 以加速下載
+        /// https://raw.githubusercontent.com/user/repo/branch/path -> https://cdn.jsdelivr.net/gh/user/repo@branch/path
+        /// </summary>
+        private static string ConvertToJsDelivrUrl(string url)
+        {
+            const string githubRawPrefix = "https://raw.githubusercontent.com/";
+
+            if (!url.StartsWith(githubRawPrefix, StringComparison.OrdinalIgnoreCase))
+                return url;
+
+            var path = url.Substring(githubRawPrefix.Length);
+            var parts = path.Split('/', 4); // user, repo, branch, filepath
+
+            if (parts.Length < 4)
+                return url;
+
+            var user = parts[0];
+            var repo = parts[1];
+            var branch = parts[2];
+            var filepath = parts[3];
+
+            return $"https://cdn.jsdelivr.net/gh/{user}/{repo}@{branch}/{filepath}";
+        }
 
         internal class AssetInfo
         {
@@ -193,20 +219,33 @@ namespace XIVLauncher.Common.Dalamud
                         NoCache = true,
                     };
 
-                    foreach (var entry in filesToUpdate)
+                    // 並行下載，最多同時 5 個
+                    using var semaphore = new SemaphoreSlim(5);
+                    var downloadTasks = filesToUpdate.Select(async entry =>
                     {
-                        var destPath = Path.Combine(currentDir.FullName, entry.FileName);
-                        var destDir = Path.GetDirectoryName(destPath);
-                        if (!Directory.Exists(destDir))
-                            Directory.CreateDirectory(destDir);
+                        await semaphore.WaitAsync().ConfigureAwait(false);
+                        try
+                        {
+                            var destPath = Path.Combine(currentDir.FullName, entry.FileName);
+                            var destDir = Path.GetDirectoryName(destPath);
+                            if (!Directory.Exists(destDir))
+                                Directory.CreateDirectory(destDir);
 
-                        // 刪除舊檔案（如果存在）
-                        if (File.Exists(destPath))
-                            File.Delete(destPath);
+                            // 刪除舊檔案（如果存在）
+                            if (File.Exists(destPath))
+                                File.Delete(destPath);
 
-                        Log.Information("[DASSET] Downloading: {0}", entry.FileName);
-                        await updater.DownloadFile(entry.Url, destPath, TimeSpan.FromMinutes(4));
-                    }
+                            var cdnUrl = ConvertToJsDelivrUrl(entry.Url);
+                            Log.Information("[DASSET] Downloading: {0} from {1}", entry.FileName, cdnUrl);
+                            await updater.DownloadFile(cdnUrl, destPath, TimeSpan.FromMinutes(4)).ConfigureAwait(false);
+                            Log.Information("[DASSET] Downloaded: {0}", entry.FileName);
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
+                    await Task.WhenAll(downloadTasks).ConfigureAwait(false);
 
                     // 更新 dev 目錄中已變更的檔案
                     try

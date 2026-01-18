@@ -25,13 +25,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="Microsoft.DotNet.ILCompiler" />
-    <None Remove="Microsoft.CodeAnalysis.BannedApiAnalyzers" />
-    <None Remove="Microsoft.CodeAnalysis.NetAnalyzers" />
     <None Remove="mscorlib" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4-beta1.23055.4" />
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0-*" />
     <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="9.0.11" />
     <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="9.0.11" />
   </ItemGroup>
