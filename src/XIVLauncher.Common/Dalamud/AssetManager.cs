@@ -106,19 +106,61 @@ namespace XIVLauncher.Common.Dalamud
 
             if (isRefreshNeeded)
             {
-                PlatformHelpers.DeleteAndRecreateDirectory(currentDir);
-
-                // Wait for it to be gone
-                Thread.Sleep(1000);
+                // 確保目錄存在，但不刪除現有檔案
+                if (!currentDir.Exists)
+                    currentDir.Create();
 
                 var packageUrl = info.PackageUrl;
 
-                var tempPath = PlatformHelpers.GetTempFileName();
-
-                if (File.Exists(tempPath))
-                    File.Delete(tempPath);
-                if (packageUrl != null)
+                // 收集需要更新的檔案清單
+                var filesToUpdate = new List<AssetInfo.Asset>();
+                foreach (var entry in info.Assets)
                 {
+                    var filePath = Path.Combine(currentDir.FullName, entry.FileName);
+                    var needsUpdate = false;
+
+                    if (!File.Exists(filePath))
+                    {
+                        needsUpdate = true;
+                        Log.Information("[DASSET] File missing, will download: {0}", entry.FileName);
+                    }
+                    else if (!string.IsNullOrEmpty(entry.Hash))
+                    {
+                        try
+                        {
+                            using var file = File.OpenRead(filePath);
+                            var fileHash = sha1.ComputeHash(file);
+                            var stringHash = BitConverter.ToString(fileHash).Replace("-", "");
+                            if (stringHash != entry.Hash)
+                            {
+                                needsUpdate = true;
+                                Log.Information("[DASSET] Hash mismatch, will download: {0} (local: {1}, remote: {2})", entry.FileName, stringHash, entry.Hash);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            needsUpdate = true;
+                            Log.Warning(ex, "[DASSET] Could not verify hash, will download: {0}", entry.FileName);
+                        }
+                    }
+
+                    if (needsUpdate)
+                        filesToUpdate.Add(entry);
+                }
+
+                Log.Information("[DASSET] {0} files need to be updated out of {1} total", filesToUpdate.Count, info.Assets.Count);
+
+                // 如果需要更新的檔案超過總數的一半，或使用 packageUrl，則重新下載整個 package
+                if (packageUrl != null && filesToUpdate.Count > info.Assets.Count / 2)
+                {
+                    Log.Information("[DASSET] Downloading full package due to many files needing update");
+                    PlatformHelpers.DeleteAndRecreateDirectory(currentDir);
+                    Thread.Sleep(1000);
+
+                    var tempPath = PlatformHelpers.GetTempFileName();
+                    if (File.Exists(tempPath))
+                        File.Delete(tempPath);
+
                     await updater.DownloadFile(packageUrl, tempPath, TimeSpan.FromMinutes(4));
                     using (var packageStream = File.OpenRead(tempPath))
                     using (var packageArc = new ZipArchive(packageStream, ZipArchiveMode.Read))
@@ -138,8 +180,9 @@ namespace XIVLauncher.Common.Dalamud
 
                     File.Delete(tempPath);
                 }
-                else
+                else if (filesToUpdate.Count > 0)
                 {
+                    // 僅下載需要更新的檔案
                     using var assetClient = new HttpClient
                     {
                         Timeout = TimeSpan.FromMinutes(30),
@@ -150,14 +193,41 @@ namespace XIVLauncher.Common.Dalamud
                         NoCache = true,
                     };
 
-                    foreach (var entry in info.Assets)
+                    foreach (var entry in filesToUpdate)
                     {
                         var destPath = Path.Combine(currentDir.FullName, entry.FileName);
                         var destDir = Path.GetDirectoryName(destPath);
                         if (!Directory.Exists(destDir))
                             Directory.CreateDirectory(destDir);
 
+                        // 刪除舊檔案（如果存在）
+                        if (File.Exists(destPath))
+                            File.Delete(destPath);
+
+                        Log.Information("[DASSET] Downloading: {0}", entry.FileName);
                         await updater.DownloadFile(entry.Url, destPath, TimeSpan.FromMinutes(4));
+                    }
+
+                    // 更新 dev 目錄中已變更的檔案
+                    try
+                    {
+                        if (!devDir.Exists)
+                            devDir.Create();
+                        foreach (var entry in filesToUpdate)
+                        {
+                            var srcPath = Path.Combine(currentDir.FullName, entry.FileName);
+                            var destPath = Path.Combine(devDir.FullName, entry.FileName);
+                            var destDirPath = Path.GetDirectoryName(destPath);
+                            if (!Directory.Exists(destDirPath))
+                                Directory.CreateDirectory(destDirPath);
+                            if (File.Exists(destPath))
+                                File.Delete(destPath);
+                            File.Copy(srcPath, destPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[DASSET] Could not copy updated files to dev dir");
                     }
                 }
             }

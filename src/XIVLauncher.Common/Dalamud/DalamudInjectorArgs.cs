@@ -3,6 +3,7 @@ namespace XIVLauncher.Common.Dalamud
     public static class DalamudInjectorArgs
     {
         public const string LAUNCH = "launch";
+        public const string INJECT = "inject";
         public const string WITHOUT_DALAMUD = "--without-dalamud";
         public const string FAKE_ARGUMENTS = "--fake-arguments";
         public const string NO_PLUGIN = "--no-plugin";
