@@ -194,6 +194,7 @@ public class SqexLauncher : ILauncher
         var response = await this.client.PostAsync(url, content);
         response.EnsureSuccessStatusCode();
         var responseBody = await response.Content.ReadAsStringAsync();
+        Log.Information("ExchangeSessionId response: {ResponseBody}", responseBody);
         var responseObj = JsonSerializer.Deserialize(responseBody, TcLoginResponseContext.Default.DictionaryStringObject) ?? [];
         if (responseObj.TryGetValue("error", out var errorNews))
         {
@@ -515,6 +516,7 @@ public class SqexLauncher : ILauncher
         var response = await this.client.SendAsync(httpRequest);
 
         var reply = await response.Content.ReadAsStringAsync();
+        Log.Information("OauthLogin response: {Reply}", reply);
 
         //TODO: 取到Error massage或是取不到token，代表登入失敗惹。
         var loginResult = JsonSerializer.Deserialize(reply, TcLoginResponseContext.Default.DictionaryStringObject) ?? [];
@@ -523,13 +525,29 @@ public class SqexLauncher : ILauncher
             throw new OauthLoginException($"[ERROR] Login failed: {error}");
         }
         var sessionId = await this.ExchangeSessionId(loginToken?.ToString() ?? "");
-        var remainSeconds = int.Parse(loginResult["remain"].ToString() ?? "0");
+
+        var remainSeconds = 0;
+        if (loginResult.TryGetValue("remain", out var remain))
+        {
+            int.TryParse(remain?.ToString(), out remainSeconds);
+        }
+
+        loginResult.TryGetValue("subscriptionType", out var subscriptionType);
+        var subType = 0;
+        if (subscriptionType != null)
+        {
+            int.TryParse(subscriptionType.ToString(), out subType);
+        }
+        // subscriptionType == 0 為免費試玩，視為可遊玩
+        var playable = subType == 0 || remainSeconds > 0;
+        Log.Information("OauthLogin: subscriptionType={SubType}, remain={Remain}, playable={Playable}", subType, remainSeconds, playable);
+
         return new OauthLoginResult
         {
             SessionId = sessionId,
             Region = 1, // Taiwan No 1!!
             TermsAccepted = true,
-            Playable = remainSeconds > 0,
+            Playable = playable,
             MaxExpansion = 7
         };
         string ToHexString(string str)
