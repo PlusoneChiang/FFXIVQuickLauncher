@@ -50,6 +50,9 @@ public class UnixDalamudRunner : IDalamudRunner
             return RunGameWithoutDalamud(gameExe, gameArgs, environment);
         }
 
+        if (OperatingSystem.IsMacOS())
+            environment["DOTNET_EnableWriteXorExecute"] = "0";
+
         // 步驟 1: 先啟動遊戲
         Log.Information("[DALAMUD] Starting game first, then inject Dalamud...");
         var gameCommand = $"\"{gameExePath}\" {gameArgs}";

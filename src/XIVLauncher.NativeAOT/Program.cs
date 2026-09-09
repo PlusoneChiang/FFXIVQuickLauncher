@@ -128,16 +128,20 @@ public class Program
     }
 
     [UnmanagedCallersOnly(EntryPoint = "ensurePrefix")]
-    public static void EnsurePrefix()
+    public static int EnsurePrefix(byte waitForServer)
     {
         try
         {
-            CompatibilityTools?.EnsurePrefix();
+            if (CompatibilityTools is null)
+                throw new InvalidOperationException("Compatibility tools are not initialized");
+            CompatibilityTools.EnsurePrefix(waitForServer != 0);
+            return 0;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Couldn't ensure Prefix");
             Troubleshooting.LogException(ex, "Couldn't ensure Prefix");
+            return 1;
         }
     }
 
